@@ -1,36 +1,37 @@
 自用版本，ZqinKing原有插件予以修改增减。
 
 原插件：
-# luci-app-adguardhome
-# luci-app-alist
-# luci-app-aria2
+~~luci-app-adguardhome~~
+~~luci-app-alist~~
+~~luci-app-aria2~~
 luci-app-autoreboot
-# luci-app-diskman
+~~luci-app-diskman~~
 luci-app-easytier
 luci-app-firewall
 luci-app-homeproxy
 luci-app-istorex
 luci-app-lucky
-# luci-app-mosdns
+~~luci-app-mosdns~~
 luci-app-nikki
-# luci-app-oaf
+~~luci-app-oaf~~
 luci-app-package-manager
 luci-app-passwall
 luci-app-quickstart
-# luci-app-samba4
-#luci-app-serverchan
-#luci-app-smartdns
-# luci-app-sqm
+~~luci-app-samba4~~
+~~luci-app-serverchan~~
+~~luci-app-smartdns~~
+~~luci-app-sqm~~
 luci-app-store
 luci-app-ttyd
 luci-app-upnp
-# luci-app-vlmcsd
-# luci-app-wol
+~~luci-app-vlmcsd~~
+~~luci-app-wol~~
 
 Add:
 luci-app-tailscale
 luci-app-openclash
 luci-app-passwall
+
 
 *************************************************************
 首先安装 Linux 系统，推荐 Ubuntu LTS  
