@@ -33,6 +33,96 @@ luci-app-openclash
 luci-app-passwall  
 
 
+https://openwrt.mpdn.fun/?dir=插件列表
+
+# OpenWrt 插件列表（中英文对照）
+
+## 网络与路由
+- **网络向导**：`luci-app-quickstart`  
+- **iStore**：`luci-app-store`  
+- **实时监控**：`luci-app-netdata`  
+- **释放内存**：`luci-app-ramfree`  
+- **WireGuard 状态**：`luci-app-wireguard`  
+- **ACME 证书**：`luci-app-acme`  
+- **自定义命令**：`luci-app-commands`  
+- **Web 管理**：`luci-app-webadmin`  
+- **TTYD 终端**：`luci-app-ttyd`  
+- **磁盘管理**：`luci-app-diskman`  
+- **分区扩容**：`luci-app-partexp`  
+- **ACL 设置**：`luci-app-acl`  
+- **高级设置**：`luci-app-advanced`  
+- **定时重启**：`luci-app-autoreboot`  
+- **Argon 主题设置**：`luci-app-argon-config`  
+- **Design 主题设置**：`luci-app-design-config`  
+
+## 文件与存储
+- **文件传输**：`luci-app-filetransfer`  
+- **关机管理**：`luci-app-poweroff`  
+- **腾讯云 DDNS**：`luci-app-tencentddns`  
+- **Docker CE 容器**：`luci-app-docker`  
+- **Docker (Dockerman)**：`luci-app-dockerman`  
+- **文件管理**：`luci-app-filemanager`  
+- **阿里云盘 WebDAV**：`luci-app-aliyundrive-webdav`  
+- **Go 阿里云盘 WebDAV**：`luci-app-go-aliyundrive-webdav`  
+- **浮动网关**：`luci-app-floatip`  
+
+## 加速与优化
+- **ShadowSocksR Plus+**：`luci-app-ssr-plus`  
+- **PassWall**：`luci-app-passwall`  
+- **PassWall2**：`luci-app-passwall2`  
+- **Bypass**：`luci-app-bypass`  
+- **HomeProxy**：`luci-app-homeproxy`  
+- **Nikki (MihomoTProxy)**：`luci-app-nikki`  
+- **Clash (Frainzy1477)**：`luci-app-clash`  
+- **OpenClash**：`luci-app-openclash`  
+- **Turbo ACC 网络加速**：`luci-app-turboacc`  
+
+## 安全与隐私
+- **AdGuard Home**：`luci-app-adguardhome`  
+- **广告屏蔽大师 Plus+**：`luci-app-adbyby-plus`  
+- **iKoolProxy 滤广告**：`luci-app-ikoolproxy`  
+- **UA2F 防检测**：`luci-app-ua2f`  
+- **MentoHUST**：`luci-app-mentohust`  
+- **MinieAP**：`luci-app-minieap`  
+
+## 多媒体与娱乐
+- **AirPlay 2 音频接收器**：`luci-app-airplay2`  
+- **音乐遥控中心**：`luci-app-music-remote-center`  
+- **可道云**：`luci-app-kodexplorer`  
+- **Alist 文件列表**：`luci-app-alist`  
+- **CloudDrive2**：`luci-app-clouddrive2`  
+- **Cloudreve**：`luci-app-cloudreve`  
+
+## 工具与实用程序
+- **蒲公英智能组网**：`luci-app-pgyvpn`  
+- **花生壳内网穿透**：`luci-app-phtunnel`  
+- **京东签到服务**：`luci-app-jd-dailybonus`  
+- **微信推送**：`luci-app-serverchan`  
+- **全能推送**：`luci-app-pushbot`  
+- **上网时间控制**：`luci-app-accesscontrol`  
+- **LXC 容器**：`luci-app-lxc`  
+- **NPS 内网穿透**：`luci-app-nps`  
+- **ZeroTier**：`luci-app-zerotier`  
+
+## 系统与高级功能
+- **Argon 主题**：`luci-theme-argon`  
+- **Design 主题**：`luci-theme-design`  
+- **Edge 主题**：`luci-theme-edge`  
+- **Material 主题**：`luci-theme-material`  
+- **动态 DNS (阿里/腾讯)**：`luci-app-ddns`  
+- **DNS 过滤器**：`luci-app-dnsfilter`  
+- **MQTT 代理**：`luci-app-mosquitto`  
+- **IP 限速**：`luci-app-eqos`  
+- **应用过滤**：`luci-app-oaf`  
+
+## 其他插件
+- **浮窗时钟**：`luci-app-ntpc`  
+- **LED 控制**：`luci-app-ledcontrol`  
+- **硬件监控**：`luci-app-hwinfo`  
+- **SSH 服务**：`luci-app-dropbear`  
+- **Telnet 服务**：`luci-app-telnet`  
+
+
 
 *************************************************************
 首先安装 Linux 系统，推荐 Ubuntu LTS  
