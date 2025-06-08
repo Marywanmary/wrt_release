@@ -24,7 +24,7 @@ FEEDS_CONF="feeds.conf.default"
 GOLANG_REPO="https://github.com/sbwml/packages_lang_golang"
 GOLANG_BRANCH="24.x"
 THEME_SET="argon"
-LAN_ADDR="192.168.1.1"
+LAN_ADDR="192.168.11.1"
 
 clone_repo() {
     if [[ ! -d $BUILD_DIR ]]; then
@@ -396,15 +396,15 @@ boot() {
     sed -i '/wireguard_watchdog/d' /etc/crontabs/root
 
     # 获取 WireGuard 接口名称
-    local wg_ifname=$(wg show | awk '/interface/ {print $2}')
+    #local wg_ifname=$(wg show | awk '/interface/ {print $2}')
 
-    if [ -n "$wg_ifname" ]; then
-        # 添加新的 wireguard_watchdog 任务，每10分钟执行一次
-        echo "*/15 * * * * /usr/bin/wireguard_watchdog" >>/etc/crontabs/root
-        uci set system.@system[0].cronloglevel='9'
-        uci commit system
-        /etc/init.d/cron restart
-    fi
+    #if [ -n "$wg_ifname" ]; then
+    #    # 添加新的 wireguard_watchdog 任务，每10分钟执行一次
+    #    echo "*/15 * * * * /usr/bin/wireguard_watchdog" >>/etc/crontabs/root
+    #    uci set system.@system[0].cronloglevel='9'
+    #    uci commit system
+    #    /etc/init.d/cron restart
+    #fi
 
     # 应用新的 crontab 配置
     crontab /etc/crontabs/root
