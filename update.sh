@@ -401,14 +401,14 @@ boot() {
     sed -i '/wireguard_watchdog/d' /etc/crontabs/root
 
     # 获取 WireGuard 接口名称
-    local wg_ifname=$(wg show | awk '/interface/ {print $2}')
+    # local wg_ifname=$(wg show | awk '/interface/ {print $2}')
 
-    if [ -n "$wg_ifname" ]; then
-        # 添加新的 wireguard_watchdog 任务，每10分钟执行一次
-        echo "*/15 * * * * /usr/bin/wireguard_watchdog" >>/etc/crontabs/root
-        uci set system.@system[0].cronloglevel='9'
-        uci commit system
-        /etc/init.d/cron restart
+    #if [ -n "$wg_ifname" ]; then
+    #    # 添加新的 wireguard_watchdog 任务，每10分钟执行一次
+    #    echo "*/15 * * * * /usr/bin/wireguard_watchdog" >>/etc/crontabs/root
+    #    uci set system.@system[0].cronloglevel='9'
+    #    uci commit system
+    #    /etc/init.d/cron restart
     fi
 
     # 应用新的 crontab 配置
@@ -694,6 +694,13 @@ add_timecontrol() {
     git clone --depth 1 https://github.com/sirpdboy/luci-app-timecontrol.git "$timecontrol_dir"
 }
 
+add_taskplan() {
+    local taskplan_dir="$BUILD_DIR/package/luci-app-taskplan"
+    # 删除旧的目录（如果存在）
+    rm -rf "$taskplan_dir" 2>/dev/null
+    git clone --depth 1 https://github.com/sirpdboy/luci-app-taskplan.git "$taskplan_dir"
+}
+
 add_gecoosac() {
     local gecoosac_dir="$BUILD_DIR/package/openwrt-gecoosac"
     # 删除旧的目录（如果存在）
@@ -792,8 +799,8 @@ update_lucky() {
     fi
 
     echo "正在更新 lucky Makefile..."
-    # 使用本地补丁文件，而不是下载
-    local patch_line="\\t[ -f \$(TOPDIR)/../patches/lucky_${version}_Linux_\$(LUCKY_ARCH)_wanji.tar.gz ] && install -Dm644 \$(TOPDIR)/../patches/lucky_${version}_Linux_\$(LUCKY_ARCH)_wanji.tar.gz \$(PKG_BUILD_DIR)/\$(PKG_NAME)_\$(PKG_VERSION)_Linux_\$(LUCKY_ARCH).tar.gz"
+    # 使用本地补丁文件，而不是下载(不使用本地补丁)
+    # local patch_line="\\t[ -f \$(TOPDIR)/../patches/lucky_${version}_Linux_\$(LUCKY_ARCH)_wanji.tar.gz ] && install -Dm644 \$(TOPDIR)/../patches/lucky_${version}_Linux_\$(LUCKY_ARCH)_wanji.tar.gz \$(PKG_BUILD_DIR)/\$(PKG_NAME)_\$(PKG_VERSION)_Linux_\$(LUCKY_ARCH).tar.gz"
 
     # 确保 Build/Prepare 部分存在，然后在其后添加我们的行
     if grep -q "Build/Prepare" "$makefile_path"; then
@@ -931,6 +938,7 @@ main() {
     fix_quickstart
     update_oaf_deconfig
     add_timecontrol
+    add_taskplan
     add_gecoosac
     update_lucky
     fix_rust_compile_error
