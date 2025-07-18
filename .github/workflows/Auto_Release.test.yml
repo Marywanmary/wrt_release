@@ -7,8 +7,6 @@ on:
     workflows: ["Auto_Cleanup"]   
     types: [completed]
     branches: [main]
-  schedule:
-    - cron: '0 16 * * 4'  # UTC时间周四16点(北京时间周五0点)
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
