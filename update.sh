@@ -418,9 +418,9 @@ START=99
 #    # 应用新的 crontab 配置
 #    crontab /etc/crontabs/root
 #}
-#EOF
-#    chmod +x "$sh_dir/custom_task"
-#}
+EOF
+    chmod +x "$sh_dir/custom_task"
+}
 
 update_pw() {
     local pw_share_dir="$BUILD_DIR/feeds/small8/luci-app-passwall/root/usr/share/passwall"
