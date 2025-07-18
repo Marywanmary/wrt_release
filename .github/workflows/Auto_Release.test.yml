@@ -24,7 +24,7 @@ jobs:
           - jdcloud_ipq60xx_libwrt
           - x64_immwrt
 
-    runs-on: ${{ env.RUNNER_OS }}
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Maximize build space
