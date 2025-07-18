@@ -1,4 +1,4 @@
-name: Release Athena_Arthur
+name: Release Arthur_Athena
 run-name: Release - ${{ inputs.model }}
 
 on:
