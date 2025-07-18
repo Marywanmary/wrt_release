@@ -91,6 +91,8 @@ remove_unwanted_packages() {
         "luci-app-ssr-plus" "luci-app-vssr" "luci-theme-argon" "luci-app-daed" "luci-app-dae"
         "luci-app-alist" "luci-app-argon-config" "luci-app-homeproxy" "luci-app-haproxy-tcp"
         "luci-app-openclash" "luci-app-mihomo" "luci-app-appfilter" "luci-app-msd_lite"
+        "luci-app-netspeedtest" "luci-app-partexp" "luci-app-taskplan" "luci-app-tailscale" 
+        "luci-app-lucky" "luci-app-ddnsto" "luci-app-easytier" 
     )
     local packages_net=(
         "haproxy" "xray-core" "xray-plugin" "dns2socks" "alist" "hysteria"
@@ -98,7 +100,7 @@ remove_unwanted_packages() {
         "sing-box" "v2ray-core" "v2ray-geodata" "v2ray-plugin" "tuic-client"
         "chinadns-ng" "ipt2socks" "tcping" "trojan-plus" "simple-obfs"
         "shadowsocksr-libev" "dae" "daed" "mihomo" "geoview" "tailscale" "open-app-filter"
-        "msd_lite"
+        "msd_lite" "lucky" "ddnsto" "easytier" 
     )
     local packages_utils=(
         "cups"
@@ -165,7 +167,8 @@ install_small8() {
         luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest \
         luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky luci-app-openclash luci-app-homeproxy \
         luci-app-amlogic nikki luci-app-nikki tailscale luci-app-tailscale oaf open-app-filter luci-app-oaf \
-        easytier luci-app-easytier msd_lite luci-app-msd_lite cups luci-app-cupsd
+        easytier luci-app-easytier msd_lite luci-app-msd_lite cups luci-app-cupsd luci-app-netspeedtest \
+        luci-app-partexp luci-app-taskplan ddnsto luci-app-ddnsto
 }
 
 install_feeds() {
@@ -392,31 +395,32 @@ set_custom_task() {
 # 设置启动优先级
 START=99
 
-boot() {
-    # 重新添加缓存请求定时任务
-    sed -i '/drop_caches/d' /etc/crontabs/root
-    echo "15 3 * * * sync && echo 3 > /proc/sys/vm/drop_caches" >>/etc/crontabs/root
-
-    # 删除现有的 wireguard_watchdog 任务
-    sed -i '/wireguard_watchdog/d' /etc/crontabs/root
-
-    # 获取 WireGuard 接口名称
-    local wg_ifname=$(wg show | awk '/interface/ {print $2}')
-
-    if [ -n "$wg_ifname" ]; then
-        # 添加新的 wireguard_watchdog 任务，每10分钟执行一次
-        echo "*/15 * * * * /usr/bin/wireguard_watchdog" >>/etc/crontabs/root
-        uci set system.@system[0].cronloglevel='9'
-        uci commit system
-        /etc/init.d/cron restart
-    fi
-
-    # 应用新的 crontab 配置
-    crontab /etc/crontabs/root
-}
-EOF
-    chmod +x "$sh_dir/custom_task"
-}
+#禁用crontabs脚本
+#boot() {
+#    # 重新添加缓存请求定时任务
+#    sed -i '/drop_caches/d' /etc/crontabs/root
+#    echo "15 3 * * * sync && echo 3 > /proc/sys/vm/drop_caches" >>/etc/crontabs/root
+#
+#    # 删除现有的 wireguard_watchdog 任务
+#    sed -i '/wireguard_watchdog/d' /etc/crontabs/root
+#
+#    # 获取 WireGuard 接口名称
+#    local wg_ifname=$(wg show | awk '/interface/ {print $2}')
+#
+#    if [ -n "$wg_ifname" ]; then
+#        # 添加新的 wireguard_watchdog 任务，每10分钟执行一次
+#        echo "*/15 * * * * /usr/bin/wireguard_watchdog" >>/etc/crontabs/root
+#        uci set system.@system[0].cronloglevel='9'
+#        uci commit system
+#        /etc/init.d/cron restart
+#    fi
+#
+#    # 应用新的 crontab 配置
+#    crontab /etc/crontabs/root
+#}
+#EOF
+#    chmod +x "$sh_dir/custom_task"
+#}
 
 update_pw() {
     local pw_share_dir="$BUILD_DIR/feeds/small8/luci-app-passwall/root/usr/share/passwall"
@@ -687,11 +691,19 @@ support_fw4_adg() {
     fi
 }
 
-add_timecontrol() {
-    local timecontrol_dir="$BUILD_DIR/package/luci-app-timecontrol"
+#禁用timecontrol
+#add_timecontrol() {
+#    local timecontrol_dir="$BUILD_DIR/package/luci-app-timecontrol"
+#    # 删除旧的目录（如果存在）
+#    rm -rf "$timecontrol_dir" 2>/dev/null
+#    git clone --depth 1 https://github.com/sirpdboy/luci-app-timecontrol.git "$timecontrol_dir"
+#}
+
+add_taskplan() {
+    local taskplan_dir="$BUILD_DIR/package/luci-app-taskplan"
     # 删除旧的目录（如果存在）
-    rm -rf "$timecontrol_dir" 2>/dev/null
-    git clone --depth 1 https://github.com/sirpdboy/luci-app-timecontrol.git "$timecontrol_dir"
+    rm -rf "$taskplan_dir" 2>/dev/null
+    git clone --depth 1 https://github.com/sirpdboy/luci-app-taskplan.git "$taskplan_dir"
 }
 
 add_gecoosac() {
@@ -930,7 +942,8 @@ main() {
     update_mosdns_deconfig
     fix_quickstart
     update_oaf_deconfig
-    add_timecontrol
+    #add_timecontrol
+    add_taskplan
     add_gecoosac
     update_lucky
     fix_rust_compile_error
