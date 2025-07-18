@@ -21,7 +21,7 @@ jobs:
         model: 
           - Arthur_Athena_immwrt
           - Arthur_Athena_Lite
-          - jdcloud_ipq60xx_libwrt
+          - jdcloud_ipq60xx_immwrt
           - x64_immwrt
 
     runs-on: ubuntu-22.04
