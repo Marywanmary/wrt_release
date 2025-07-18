@@ -21,11 +21,8 @@ jobs:
         model: 
           - Arthur_Athena_immwrt
           - Arthur_Athena_Lite
-          - Arthur_immwrt
-          - Arthur_Lite
-          - Athena_immwrt
-          - Athena_Lite
           - jdcloud_ipq60xx_libwrt
+          - x64_immwrt
 
     runs-on: ${{ env.RUNNER_OS }}
 
@@ -120,7 +117,7 @@ jobs:
           OPENWRT_ARMVIRT: firmware/*.tar.gz
           PACKAGE_SOC: s905d
           KERNEL_VERSION_NAME: 6.6.y
-          WHOAMI: ZqinKing
+          WHOAMI: Mary
 
       - name: Prepare Release Body
         run: |
