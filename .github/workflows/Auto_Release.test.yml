@@ -22,7 +22,7 @@ on:
     - cron: '0 16 * * 4'  # UTC时间周四16点(北京时间周五0点)
     
   workflow_run:
-    workflows: ["Clean"]
+    workflows: ["Auto_Cleanup"]
     types: [completed]
 
 env:
@@ -31,7 +31,7 @@ env:
 
 jobs:
   build:
-    # 如果由clean工作流触发，则使用完整矩阵
+    # 如果由Auto_Cleanup工作流触发，则使用完整矩阵
     if: |
       (github.event_name == 'schedule') ||
       (github.event_name == 'workflow_dispatch') ||
