@@ -16,7 +16,7 @@ on:
           - Arthur_Lite
           - Athena_immwrt
           - Athena_Lite
-          - jdcloud_ipq60xx_libwrt
+          - jdcloud_ipq60xx_immwrt
 
       runs-on:
         required: true
