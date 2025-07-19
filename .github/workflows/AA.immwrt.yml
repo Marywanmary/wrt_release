@@ -1,4 +1,4 @@
-name: AA.test
+name: AA.immwrt
 run-name: Build Arthur_Athena_immwrt - ${{ github.event_name == 'schedule' && 'Scheduled Run' || 'Manual Run' }}
 
 on:
