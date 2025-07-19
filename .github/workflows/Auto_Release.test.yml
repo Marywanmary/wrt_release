@@ -1,5 +1,5 @@
-name: Release Test Arthur_Athena
-run-name: Release - ${{ github.event_name == 'workflow_run' && 'Auto_Cleanup Triggered' || 'Manual Run' }}
+name: Auto.rls.test Arthur_Athena
+run-name: Auto Release - ${{ github.event_name == 'workflow_run' && 'Auto_Cleanup Triggered' || 'Manual Run' }}
 
 on:
   workflow_dispatch:  # 手动触发，无需输入参数
