@@ -1,5 +1,5 @@
 name: Auto.rls.AA test
-run-name: Release - ${{ inputs.model }}
+run-name: Autorls.test - ${{ inputs.model }}
 
 on:
   schedule:
