@@ -3,8 +3,8 @@ run-name: Autorls.test - ${{ inputs.model }}
 
 on:
   schedule:
-    # 北京时间12:15（UTC时间04:15）
-    - cron: '15 4 * * *'  # 每日UTC 4:15触发[6,7](@ref)
+    # 北京时间12:20（UTC时间04:15）
+    - cron: '20 4 * * *'  # 每日UTC 4:20触发[6,7](@ref)
   
   workflow_dispatch:
     inputs:
@@ -20,7 +20,7 @@ on:
         required: true
         description: Runs on...
         type: choice
-        default: ubuntu-22.04  # 移除了ubuntu-22.04选项[3](@ref)
+        default: ubuntu-22.04 
         options:
           - ubuntu-22.04
 
