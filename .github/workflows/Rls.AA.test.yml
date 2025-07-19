@@ -3,24 +3,7 @@ run-name: Autorls.test - ${{ matrix.model }}
 
 on:
   schedule:
-    - cron: '0 16 * * *'  # UTC 16:00 (北京时间次日0:00)
-  workflow_dispatch:
-    inputs:
-      build_type:
-        description: "编译类型"
-        type: choice
-        default: full
-        options:
-          - full         # 编译所有固件
-          - single       # 编译单个固件
-      selected_device:
-        description: "选择设备 (仅当编译类型为single时有效)"
-        type: choice
-        default: Arthur_Athena_immwrt
-        options:
-          - Arthur_Athena_immwrt
-          - Arthur_Athena_Lite
-        required: false
+    - cron: '*/5 * * * *'  # 每5分钟运行一次
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -29,23 +12,20 @@ jobs:
   build:
     strategy:
       matrix:
-        # 根据触发类型决定矩阵内容
-        model: ${{ 
-          github.event_name == 'schedule' || github.event.inputs.build_type == 'full' 
-            ? ['Arthur_Athena_immwrt', 'Arthur_Athena_Lite'] 
-            : [github.event.inputs.selected_device] 
-        }}
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Log Build Info
-        run: |
-          echo "===== 构建信息 ====="
-          echo "触发类型: ${{ github.event_name }}"
-          echo "触发时间: $(TZ=Asia/Shanghai date +'%Y-%m-%d %H:%M:%S')"
-          echo "编译设备: ${{ matrix.model }}"
-          echo "工作目录: $(pwd)"
-          echo "====================="
+        model: [
+          'Arthur_Athena_immwrt',
+          'Arthur_Athena_Lite',
+          'Arthur_immwrt',
+          'Arthur_Lite',
+          'Athena_immwrt',
+          'Athena_Lite',
+          'jdcloud_ipq60xx_immwrt'
+        ]
+      fail-fast: false  # 即使一个失败也继续其他任务
 
+    runs-on: ubuntu-22.04  # 固定使用ubuntu-22.04环境
+
+    steps:
       - name: Maximize build space
         uses: AdityaGarg8/remove-unwanted-software@v5
         with:
@@ -65,33 +45,24 @@ jobs:
         env:
           DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)
-          sudo apt -y install dos2unix libfuse-dev tree
-          sudo apt -y autoremove --purge
-          sudo apt clean
-          sudo timedatectl set-timezone Asia/Shanghai
-          echo "系统初始化完成"
-          tree -L 2  # 显示目录结构
+          sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
+          sudo -E apt -yqq install dos2unix
+          sudo -E apt -yqq install libfuse-dev
+          sudo -E apt -yqq autoremove --purge
+          sudo -E apt -yqq autoclean
+          sudo -E apt -yqq clean
+          sudo -E systemctl daemon-reload
+          sudo -E timedatectl set-timezone "Asia/Shanghai"
 
       - name: Initialization Values
         run: |
-          MODEL_NAME="${{ matrix.model }}"
-          echo "MODEL_NAME=$MODEL_NAME" >> $GITHUB_ENV
-          BUILD_DATE=$(TZ=Asia/Shanghai date +"%y.%m.%d_%H.%M.%S")
+          export BUILD_DATE=$(TZ=UTC-8 date +"%y.%m.%d_%H.%M.%S")
           echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
-          BUILD_SRC=$(awk -F"=" '/REPO_URL/ {print $NF}' "./compilecfg/$MODEL_NAME.ini")
+          export BUILD_SRC=$(awk -F"=" '/REPO_URL/ {print $NF}' "./compilecfg/${{ matrix.model }}.ini")
           echo "BUILD_SRC=$BUILD_SRC" >> $GITHUB_ENV
-          echo "====================="
-          echo "设备: $MODEL_NAME"
-          echo "源码: $BUILD_SRC"
-          echo "编译时间: $BUILD_DATE"
-          echo "====================="
 
       - name: Pre Clone
-        run: |
-          echo "开始预克隆代码"
-          ./pre_clone_action.sh ${{ env.MODEL_NAME }}
-          echo "预克隆完成"
+        run: ./pre_clone_action.sh ${{ matrix.model }}
 
       - name: Cache Dependencies
         uses: actions/cache@v4
@@ -99,86 +70,59 @@ jobs:
           path: |
             ./action_build/.ccache
             ./action_build/staging_dir
-          key: ${{ runner.os }}-${{ env.MODEL_NAME }}-${{ hashFiles('**/repo_flag') || 'default' }}
+          key: ${{ runner.os }}-${{ hashFiles('./repo_flag') }}-${{ env.BUILD_DATE }}
           restore-keys: |
-            ${{ runner.os }}-${{ env.MODEL_NAME }}-
+            ${{ runner.os }}-${{ hashFiles('./repo_flag') }}-
 
       - name: Refresh the cache
         run: |
-          echo "刷新缓存文件时间戳..."
-          find "./action_build/staging_dir" -type d -name "stamp" -not -path "*target*" -exec touch {} +
-          echo "缓存刷新完成"
+          if [ -d "./action_build/staging_dir" ]; then
+            find "./action_build/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r dir; do
+                find "$dir" -type f -exec touch {} +
+            done
+          fi
 
       - name: Build Firmware
-        timeout-minutes: 180  # 设置3小时超时
-        run: |
-          echo "========= 开始编译 ${{ env.MODEL_NAME }} ========="
-          mkdir -p ./firmware/${{ env.MODEL_NAME }}
-          ./build.sh ${{ env.MODEL_NAME }}
-          echo "编译完成: ${{ env.MODEL_NAME }}"
-          du -sh ./firmware/${{ env.MODEL_NAME }}
+        run: ./build.sh ${{ matrix.model }}
 
       - name: Get Kernel Version
         run: |
-          KVER=$(find ./action_build/dl -name 'linux-*.tar.xz' -printf '%f\n' | grep -Po '\d+\.\d+\.\d+' | sort -Vr | head -1)
-          echo "KVER=${KVER:-unknown}" >> $GITHUB_ENV
-          echo "内核版本: $KVER"
-
-      - name: Install GitHub CLI
-        run: |
-          echo "安装GitHub CLI..."
-          sudo apt update >/dev/null
-          sudo apt install -y gh >/dev/null
-          gh --version
-          echo "安装完成"
+          # 获取内核版本
+          echo "KVER=$(find ./action_build/dl -maxdepth 1 -name 'linux-[4-6].*' | sort -r | head -n 1 | grep -oE '[4-6]\.[0-9]{1,3}\.[0-9]{1,3}')" >> $GITHUB_ENV
 
       - name: Delete Old Cache
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "清理旧缓存..."
-          gh cache list --key "${{ runner.os }}-${{ env.MODEL_NAME }}" --json key -q '.[].key' | \
-          while read -r key; do
-            gh cache delete "$key" --confirm || true
+          # 获取缓存列表并删除
+          gh cache list --key ${{ runner.os }}-${{ hashFiles('./repo_flag') }}- --json key --jq '.[] | .key' | while read -r key; do
+            gh cache delete "$key"
           done
-          echo "缓存状态:"
+          # 输出缓存状态
+          echo "========cache status========"
           echo "ccache: $(du -sh ./action_build/.ccache | cut -f 1)"
           echo "staging: $(du -sh ./action_build/staging_dir | cut -f 1)"
 
       - name: Machine Information
         run: |
-          echo "===== 系统信息 ====="
-          lscpu | grep -E "Model name|Core|Thread"
-          echo "---------------------"
-          free -h
-          echo "---------------------"
+          echo "=============================================="
+          lscpu | grep -E "name|Core|Thread"
+          echo "=============================================="
           df -h
-          echo "====================="
+          echo "=============================================="
 
       - name: Prepare Release Body
         run: |
-          cat <<EOF > release_body.txt
-          云编译发布 - ${{ env.MODEL_NAME }}
-          触发方式: ${{ github.event_name }}
-          触发时间: ${{ env.BUILD_DATE }}
-          源码: ${{ env.BUILD_SRC }}
-          Kernel: ${{ env.KVER }}
-          设备配置: ${{ env.MODEL_NAME }}
-          WIFI密码: 12345678
-          LAN地址: 192.168.111.1
-          包含插件:
-          $(grep -hoP "luci-app-\w+" ./firmware/${{ env.MODEL_NAME }}/*.manifest | sort -u)
-          EOF
-          
-          echo "===== 发布内容 ====="
-          cat release_body.txt
-          echo "==================="
+          echo "云编译发布" > release_body.txt
+          echo "源码：${{ env.BUILD_SRC }}" >> release_body.txt
+          echo "Kernel: ${{ env.KVER }}" >> release_body.txt
+          echo "亚瑟/雅典娜禁用Docker/Coremark/mwan3" >> release_body.txt
+          echo "WIFI密码: 12345678" >> release_body.txt
+          echo "LAN地址: 192.168.111.1" >> release_body.txt
+          echo "插件：" >> release_body.txt
+          echo "$(grep -oP 'luci-app(-[a-zA-Z0-9]+)+' ./firmware/*.manifest | awk -F":" '{print $NF}')" >> release_body.txt
 
       - name: Release Firmware
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.BUILD_DATE }}_${{ env.MODEL_NAME }}
-          files: ./firmware/${{ env.MODEL_NAME }}/*.*
+          tag_name: ${{ env.BUILD_DATE }}_${{ matrix.model }}
+          files: ./firmware/*.*
           body_path: ./release_body.txt
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
