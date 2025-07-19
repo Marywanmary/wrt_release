@@ -8,8 +8,10 @@ on:
         required: true
         description: Device Model
         type: choice
-        default: jdcloud_ipq60xx_immwrt
+        default: Arthur_Athena_immwrt
         options:
+          - Arthur_Athena_immwrt
+          - Arthur_Athena_Lite
           - aliyun_ap8220_immwrt
           - cmcc_rax3000m_immwrt
           - jdcloud_ax6000_immwrt
