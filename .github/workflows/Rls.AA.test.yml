@@ -20,9 +20,9 @@ on:
         required: true
         description: Runs on...
         type: choice
-        default: ubuntu-20.04  # 移除了ubuntu-22.04选项[3](@ref)
+        default: ubuntu-22.04  # 移除了ubuntu-22.04选项[3](@ref)
         options:
-          - ubuntu-20.04
+          - ubuntu-22.04
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
