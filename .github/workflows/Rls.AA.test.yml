@@ -1,10 +1,10 @@
-name: Release_test_Arthur_Athena
+name: Auto.rls.AA test
 run-name: Release - ${{ inputs.model }}
 
 on:
   schedule:
-    # 修正时间: 周四16点UTC=周五0点北京时间
-    - cron: '0 3 * * *'
+    # 修正时间: 每日4点UTC=每日12点北京时间
+    - cron: '0 4 * * *'
   
   workflow_dispatch:
     inputs:
