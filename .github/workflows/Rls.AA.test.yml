@@ -3,7 +3,7 @@ run-name: Autorls.test - ${{ matrix.model }}
 
 on:
   schedule:
-    - cron: '0 17 * * *'  # 每5分钟运行一次
+    - cron: '5 * * * *'  # 每5分钟运行一次
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
