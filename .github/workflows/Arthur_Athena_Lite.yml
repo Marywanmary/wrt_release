@@ -5,7 +5,7 @@ on:
   workflow_dispatch:  # 手动触发
   schedule:
    # - cron: '0 19 * * 4'  # 北京时间每周五3点 (UTC时间周四19:00)
-    - cron: '*/5 * * * *'  # 北京时间每周五3点 (UTC时间周四19:00)
+    - cron: '*/15 * * * *'  # 北京时间每周五3点 (UTC时间周四19:00)
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   RUNNER_OS: ubuntu-22.04
