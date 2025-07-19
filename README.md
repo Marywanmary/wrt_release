@@ -1,9 +1,9 @@
 仅自用的immortalwrt京东云固件，包括亚瑟和雅典娜，jdcloud_ipq60xx_immwrt和x64_immwrt同zqinking软件未作修改。
 
-# 亚  瑟Lite禁用Docker/Coremark/mwan3，仅提供netspeedtest，partexp，taskplan，upnp，samba4,nikki
-# 亚  瑟    禁用Docker/Coremark/mwan3，仅提供netspeedtest，partexp，taskplan，upnp，samba4，nikki，tailscale
-# 雅典娜Lite禁用Docker/Coremark/mwan3，仅提供netspeedtest，partexp，taskplan，upnp，samba4，openclash，tailscale，lucky
-# 雅典娜    禁用Docker/Coremark/mwan3，仅提供netspeedtest，partexp，taskplan，upnp，samba4，openclash，tailscale，lucky，ddns-go，ddnsto，easytier，homeproxy
+亚  瑟Lite禁用Docker/Coremark/mwan3，仅提供netspeedtest，partexp，taskplan，upnp，samba4,nikki
+亚  瑟    禁用Docker/Coremark/mwan3，仅提供netspeedtest，partexp，taskplan，upnp，samba4，nikki，tailscale
+雅典娜Lite禁用Docker/Coremark/mwan3，仅提供netspeedtest，partexp，taskplan，upnp，samba4，openclash，tailscale，lucky
+雅典娜    禁用Docker/Coremark/mwan3，仅提供netspeedtest，partexp，taskplan，upnp，samba4，openclash，tailscale，lucky，ddns-go，ddnsto，easytier，homeproxy
 
 WIFI密码: 12345678
 LAN地址: 192.168.111.1
