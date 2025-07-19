@@ -3,8 +3,8 @@ run-name: Autorls.test - ${{ inputs.model }}
 
 on:
   schedule:
-    # 北京时间12:20（UTC时间04:15）
-    - cron: '20 4 * * *'  # 每日UTC 4:20触发[6,7](@ref)
+    # 北京时间0点（UTC 时间 16点）
+    - cron: '35 4 * * *' 
   
   workflow_dispatch:
     inputs:
@@ -16,20 +16,13 @@ on:
         options:
           - Arthur_Athena_immwrt
           - Arthur_Athena_Lite
-      runs-on:
-        required: true
-        description: Runs on...
-        type: choice
-        default: ubuntu-22.04 
-        options:
-          - ubuntu-22.04
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
   build:
-    runs-on: ${{ inputs.runs-on || 'ubuntu-20.04' }}  # 默认值同步修改
+    runs-on: ubuntu-22.04
     steps:
       - name: Maximize build space
         uses: AdityaGarg8/remove-unwanted-software@v5
@@ -54,13 +47,13 @@ jobs:
           sudo apt -y install dos2unix libfuse-dev
           sudo apt -y autoremove --purge
           sudo apt clean
-          sudo timedatectl set-timezone Asia/Shanghai
+          sudo timedatectl set-timezone Asia/Shanghai  # 确保时区正确[7](@ref)
 
       - name: Initialization Values
         run: |
           MODEL_NAME="${{ inputs.model || 'Arthur_Athena_immwrt' }}"
           echo "MODEL_NAME=$MODEL_NAME" >> $GITHUB_ENV
-          export BUILD_DATE=$(TZ=Asia/Shanghai date +"%y.%m.%d_%H.%M.%S")
+          BUILD_DATE=$(TZ=Asia/Shanghai date +"%y.%m.%d_%H.%M.%S")
           echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
           BUILD_SRC=$(awk -F"=" '/REPO_URL/ {print $NF}' "./compilecfg/$MODEL_NAME.ini")
           echo "BUILD_SRC=$BUILD_SRC" >> $GITHUB_ENV
@@ -74,7 +67,7 @@ jobs:
           path: |
             ./action_build/.ccache
             ./action_build/staging_dir
-          key: ${{ runner.os }}-${{ env.MODEL_NAME }}-${{ hashFiles('**/repo_flag') }}
+          key: ${{ runner.os }}-${{ env.MODEL_NAME }}-${{ hashFiles('**/repo_flag') || 'default' }}  # 防失效处理[3](@ref)
           restore-keys: |
             ${{ runner.os }}-${{ env.MODEL_NAME }}-
 
@@ -91,7 +84,9 @@ jobs:
           echo "KVER=${KVER:-unknown}" >> $GITHUB_ENV
 
       - name: Install GitHub CLI
-        run: sudo apt update && sudo apt install -y gh
+        run: |
+          sudo apt update || true
+          sudo apt install -y gh
 
       - name: Delete Old Cache
         env:
@@ -99,7 +94,7 @@ jobs:
         run: |
           gh cache list --key "${{ runner.os }}-${{ env.MODEL_NAME }}" --json key -q '.[].key' | \
           while read -r key; do
-            gh cache delete "$key" --confirm
+            gh cache delete "$key" --confirm || true  # 避免失败中断
           done
           echo "========cache status========"
           echo "ccache: $(du -sh ./action_build/.ccache | cut -f 1)"
