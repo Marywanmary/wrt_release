@@ -118,7 +118,8 @@ CONFIG_PACKAGE_smartmontools-drivedb=y
 CONFIG_PACKAGE_mii-tool=y
 CONFIG_PACKAGE_default-settings=y
 CONFIG_PACKAGE_default-settings-chn=y
-CONFIG_PACKAGE_nikki=y
+#CONFIG_PACKAGE_nikki=y
+CONFIG_PACKAGE_openclash=y
 CONFIG_PACKAGE_tailscale=y
 
 ##  Coremark
@@ -167,7 +168,7 @@ CONFIG_PACKAGE_luci-i18n-athena-led-zh-cn=m
 # Mary个人订制ipk
 CONFIG_PACKAGE_luci-app-netspeedtest=y
 #CONFIG_PACKAGE_luci-app-nikki=y
-CONFIG_PACKAGE_luci-i18n-nikki-zh-cn=y
+#CONFIG_PACKAGE_luci-i18n-nikki-zh-cn=y
 CONFIG_PACKAGE_luci-app-openclash=y
 CONFIG_PACKAGE_luci-app-tailscale=y
 CONFIG_PACKAGE_luci-i18n-tailscale-zh-cn=y
