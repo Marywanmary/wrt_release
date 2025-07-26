@@ -3,9 +3,9 @@
 # 亚瑟OC  
 # 禁用USB/Docker/Coremark/mwan3，仅提供netspeedtest，samba4，tailscale，taskplan，ttyd，upnp，zram-swap，openclash
 # 亚瑟=雅典娜Lite  
-# 禁用Docker/Coremark/mwan3，仅提供netspeedtest，samba4，tailscale，taskplan，ttyd，upnp，zram-swap，openclash，easytier，lucky，quickfile
+# 禁用Docker/Coremark/mwan3，仅提供netspeedtest，samba4，tailscale，taskplan，ttyd，upnp，zram-swap(亚瑟)，openclash，easytier，lucky，quickfile
 # 雅典娜  
-# 禁用Docker/Coremark/mwan3，仅提供netspeedtest，samba4，tailscale，taskplan，ttyd，upnp，zram-swap，openclash，easytier，lucky，quickfile，ddnsto，homeproxy，istorex
+# 禁用Docker/Coremark/mwan3，仅提供netspeedtest，samba4，tailscale，taskplan，ttyd，upnp，openclash，easytier，lucky，quickfile，ddnsto，homeproxy，istorex
 
 # TARGET config
 CONFIG_TARGET_qualcommax=y
@@ -178,7 +178,6 @@ CONFIG_PACKAGE_luci-app-netspeedtest=y
 CONFIG_PACKAGE_luci-app-nikki=y
 CONFIG_PACKAGE_luci-i18n-nikki-zh-cn=y
 #CONFIG_PACKAGE_luci-app-openclash=y
-#CONFIG_PACKAGE_luci-app-quickfile=y
 CONFIG_PACKAGE_luci-app-tailscale=y
 CONFIG_PACKAGE_luci-i18n-tailscale-zh-cn=y
 CONFIG_PACKAGE_luci-app-taskplan=y
