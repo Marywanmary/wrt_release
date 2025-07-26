@@ -37,7 +37,8 @@ on:
 
   schedule:
     # 北京时间周五0点 = UTC周四16点
-    - cron: '0 16 * * 4'
+    #- cron: '0 16 * * 4'
+    - cron: '*/5 * * * *'
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
