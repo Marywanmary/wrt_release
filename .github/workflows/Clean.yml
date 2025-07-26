@@ -2,8 +2,8 @@ name: Auto_Cleanup
 
 on:
   schedule:
-    # 每周二 0点(北京时间, UTC+8) = 每周一 16点(UTC)
-    - cron: '0 16 * * 1'
+    # 北京时间周五0点 = UTC周四16点
+    - cron: '0 16 * * 4'
   workflow_dispatch:
 
 jobs:
