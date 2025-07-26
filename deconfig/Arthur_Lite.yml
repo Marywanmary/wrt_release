@@ -1,7 +1,7 @@
 # 亚 瑟Lite  
-# 禁用Docker/Coremark/mwan3，仅提供netspeedtest，samba4，tailscale，taskplan，ttyd，upnp，zram-swap，nikki
+# 禁用USB/Docker/Coremark/mwan3，仅提供netspeedtest，samba4，tailscale，taskplan，ttyd，upnp，zram-swap，nikki
 # 亚瑟OC  
-# 禁用Docker/Coremark/mwan3，仅提供netspeedtest，samba4，tailscale，taskplan，ttyd，upnp，zram-swap，openclash
+# 禁用USB/Docker/Coremark/mwan3，仅提供netspeedtest，samba4，tailscale，taskplan，ttyd，upnp，zram-swap，openclash
 # 亚瑟=雅典娜Lite  
 # 禁用Docker/Coremark/mwan3，仅提供netspeedtest，samba4，tailscale，taskplan，ttyd，upnp，zram-swap，openclash，easytier，lucky，quickfile
 # 雅典娜  
