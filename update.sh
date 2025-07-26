@@ -24,7 +24,7 @@ FEEDS_CONF="feeds.conf.default"
 GOLANG_REPO="https://github.com/sbwml/packages_lang_golang"
 GOLANG_BRANCH="25.x"
 THEME_SET="argon"
-LAN_ADDR="192.168.1.1"
+LAN_ADDR="192.168.111.1"
 
 clone_repo() {
     if [[ ! -d $BUILD_DIR ]]; then
@@ -157,16 +157,26 @@ update_golang() {
     fi
 }
 
+# 原zqinking代码 install_small8() {
+#    ./scripts/feeds install -p small8 -f xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
+#        naiveproxy shadowsocks-rust sing-box v2ray-core v2ray-geodata v2ray-geoview v2ray-plugin \
+#        tuic-client chinadns-ng ipt2socks tcping trojan-plus simple-obfs shadowsocksr-libev \
+#        luci-app-passwall smartdns luci-app-smartdns v2dat mosdns luci-app-mosdns \
+#        adguardhome luci-app-adguardhome ddns-go luci-app-ddns-go taskd luci-lib-xterm luci-lib-taskd \
+#        luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest \
+#        luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky luci-app-openclash luci-app-homeproxy \
+#        luci-app-amlogic nikki luci-app-nikki tailscale luci-app-tailscale oaf open-app-filter luci-app-oaf \
+#        easytier luci-app-easytier msd_lite luci-app-msd_lite cups luci-app-cupsd
+#}
 install_small8() {
     ./scripts/feeds install -p small8 -f xray-core xray-plugin dns2tcp dns2socks haproxy hysteria \
         naiveproxy shadowsocks-rust sing-box v2ray-core v2ray-geodata v2ray-geoview v2ray-plugin \
         tuic-client chinadns-ng ipt2socks tcping trojan-plus simple-obfs shadowsocksr-libev \
-        luci-app-passwall smartdns luci-app-smartdns v2dat mosdns luci-app-mosdns \
-        adguardhome luci-app-adguardhome ddns-go luci-app-ddns-go taskd luci-lib-xterm luci-lib-taskd \
+        taskd luci-lib-xterm luci-lib-taskd \
         luci-app-store quickstart luci-app-quickstart luci-app-istorex luci-app-cloudflarespeedtest \
         luci-theme-argon netdata luci-app-netdata lucky luci-app-lucky luci-app-openclash luci-app-homeproxy \
         luci-app-amlogic nikki luci-app-nikki tailscale luci-app-tailscale oaf open-app-filter luci-app-oaf \
-        easytier luci-app-easytier msd_lite luci-app-msd_lite cups luci-app-cupsd
+        easytier luci-app-easytier ddnsto luci-app-ddnsto netspeedtest luci-app-netspeedtest
 }
 
 install_fullconenat() {
@@ -394,15 +404,15 @@ boot() {
     # 删除现有的 wireguard_watchdog 任务
     sed -i '/wireguard_watchdog/d' /etc/crontabs/root
 
-    # 获取 WireGuard 接口名称
-    local wg_ifname=$(wg show | awk '/interface/ {print $2}')
+    ## 获取 WireGuard 接口名称
+    #local wg_ifname=$(wg show | awk '/interface/ {print $2}')
 
-    if [ -n "$wg_ifname" ]; then
-        # 添加新的 wireguard_watchdog 任务，每10分钟执行一次
-        echo "*/15 * * * * /usr/bin/wireguard_watchdog" >>/etc/crontabs/root
-        uci set system.@system[0].cronloglevel='9'
-        uci commit system
-        /etc/init.d/cron restart
+    #if [ -n "$wg_ifname" ]; then
+    #    # 添加新的 wireguard_watchdog 任务，每10分钟执行一次
+    #    echo "*/15 * * * * /usr/bin/wireguard_watchdog" >>/etc/crontabs/root
+    #    uci set system.@system[0].cronloglevel='9'
+    #    uci commit system
+    #    /etc/init.d/cron restart
     fi
 
     # 应用新的 crontab 配置
@@ -455,7 +465,7 @@ update_nss_pbuf_performance() {
 set_build_signature() {
     local file="$BUILD_DIR/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js"
     if [ -d "$(dirname "$file")" ] && [ -f $file ]; then
-        sed -i "s/(\(luciversion || ''\))/(\1) + (' \/ build by ZqinKing')/g" "$file"
+        sed -i "s/(\(luciversion || ''\))/(\1) + (' \/ build by Mary')/g" "$file"
     fi
 }
 
@@ -681,11 +691,17 @@ support_fw4_adg() {
     fi
 }
 
-add_timecontrol() {
-    local timecontrol_dir="$BUILD_DIR/package/luci-app-timecontrol"
+# add_timecontrol() {
+#    local timecontrol_dir="$BUILD_DIR/package/luci-app-timecontrol"
+#    # 删除旧的目录（如果存在）
+#    rm -rf "$timecontrol_dir" 2>/dev/null
+#    git clone --depth 1 https://github.com/sirpdboy/luci-app-timecontrol.git "$timecontrol_dir"
+#}
+add_taskplan() {
+    local taskplan_dir="$BUILD_DIR/package/luci-app-taskplan"
     # 删除旧的目录（如果存在）
-    rm -rf "$timecontrol_dir" 2>/dev/null
-    git clone --depth 1 https://github.com/sirpdboy/luci-app-timecontrol.git "$timecontrol_dir"
+    rm -rf "$taskplan_dir" 2>/dev/null
+    git clone --depth 1 https://github.com/sirpdboy/luci-app-taskplan.git "$taskplan_dir"
 }
 
 add_gecoosac() {
@@ -972,7 +988,8 @@ main() {
     update_mosdns_deconfig
     fix_quickstart
     update_oaf_deconfig
-    add_timecontrol
+    #add_timecontrol
+    add_taskplan
     add_gecoosac
     add_quickfile
     update_lucky
