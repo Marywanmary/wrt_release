@@ -5,7 +5,7 @@
 # 亚瑟=雅典娜Lite  
 # 禁用Docker/Coremark/mwan3，仅提供netspeedtest，samba4，tailscale，taskplan，ttyd，upnp，zram-swap，openclash，easytier，lucky，quickfile
 # 雅典娜  
-# 禁用Docker/Coremark/mwan3，仅提供netspeedtest，samba4，tailscale，taskplan，ttyd，upnp，zram-swap，openclash，ddnsto，easytier，homeproxy，lucky，quickfile
+# 禁用Docker/Coremark/mwan3，仅提供netspeedtest，samba4，tailscale，taskplan，ttyd，upnp，zram-swap，openclash，easytier，lucky，quickfile，ddnsto，homeproxy，istorex
 
 # TARGET config
 CONFIG_TARGET_qualcommax=y
@@ -108,11 +108,11 @@ CONFIG_PACKAGE_fuse-utils=y
 CONFIG_PACKAGE_ntfs3-mount=y
 CONFIG_PACKAGE_openssh-sftp-server=y
 CONFIG_PACKAGE_tcpdump=y
-#CONFIG_PACKAGE_sgdisk=y
+CONFIG_PACKAGE_sgdisk=y
 CONFIG_PACKAGE_openssl-util=y
 CONFIG_PACKAGE_resize2fs=y
 CONFIG_PACKAGE_qrencode=y
-CONFIG_PACKAGE_smartmontools-drivedb=y
+#CONFIG_PACKAGE_smartmontools-drivedb=y
 #CONFIG_PACKAGE_usbutils=y
 #CONFIG_PACKAGE_usbmuxd=y
 CONFIG_PACKAGE_mii-tool=y
