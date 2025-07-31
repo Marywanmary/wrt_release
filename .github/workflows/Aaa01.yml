@@ -3,7 +3,7 @@ run-name: Auto Release - Arthur_Athena
 
 on:
   workflow_run:
-    workflows: ["Auto Cleanup"]
+    workflows: ["Auto_Cleanup"]
     types:
       - completed
   schedule:
