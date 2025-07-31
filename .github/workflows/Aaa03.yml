@@ -1,4 +1,4 @@
-name: Auto Compile Arthur_Athena
+name: Auto AA-03
 
 on:
   workflow_run:
