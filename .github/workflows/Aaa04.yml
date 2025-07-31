@@ -1,0 +1,221 @@
+name: Auto AA-04
+
+on:
+  workflow_run:
+    workflows: ["Auto_Cleanup"]
+    types:
+      - completed
+  schedule:
+    - cron: '0 16 * * 4'  # 北京时间周五0点
+  workflow_dispatch:
+
+env:
+  REPO_URL_LIBWRT: https://github.com/LiBwrt/openwrt-6.x.git
+  REPO_BRANCH_LIBWRT: k6.12-nss
+  BUILD_DIR_LIBWRT: libwrt-k612
+  REPO_URL_IMMWRT: https://github.com/VIKINGYFY/immortalwrt.git
+  REPO_BRANCH_IMMWRT: main
+  BUILD_DIR_IMMWRT: imm-nss
+
+permissions:
+  actions: write
+
+jobs:
+  compile:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: 检出代码并清理磁盘空间
+      uses: actions/checkout@v4
+
+    - name: 进一步清理磁盘空间
+      uses: AdityaGarg8/remove-unwanted-software@v5
+      with:
+        remove-dotnet: "true"
+        remove-android: "true"
+        remove-haskell: "true"
+        remove-codeql: "true"
+        remove-docker-images: "true"
+        remove-large-packages: "true"
+        remove-cached-tools: "true"
+        remove-swapfile: "true"
+
+    - name: Cache Dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ./${{ env.BUILD_DIR_LIBWRT }}/.ccache
+          ./${{ env.BUILD_DIR_LIBWRT }}/staging_dir
+          ./${{ env.BUILD_DIR_LIBWRT }}/bin
+          ./${{ env.BUILD_DIR_IMMWRT }}/.ccache
+          ./${{ env.BUILD_DIR_IMMWRT }}/staging_dir
+          ./${{ env.BUILD_DIR_IMMWRT }}/bin
+        key: ubuntu-22.04-${{ hashFiles('**/repo_flag') }}-${{ env.BUILD_DATE }}
+        restore-keys: |
+          ubuntu-22.04-${{ hashFiles('**/repo_flag') }}-
+
+    - name: Refresh the cache
+      run: |
+        for build_dir in ${{ env.BUILD_DIR_LIBWRT }} ${{ env.BUILD_DIR_IMMWRT }}; do
+          if [ -d "./$build_dir/staging_dir" ]; then
+            find "./$build_dir/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r dir; do
+                find "$dir" -type f -exec touch {} +
+            done
+          fi
+        done
+
+    - name: 设置编译环境
+      run: |
+        sudo apt update
+        sudo apt install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib gettext git libncurses5-dev libssl-dev python3-setuptools rsync swig unzip zlib1g-dev file wget curl
+
+    - name: 克隆LiBwrt源码
+      run: |
+        git clone -b $REPO_BRANCH_LIBWRT $REPO_URL_LIBWRT $BUILD_DIR_LIBWRT
+        cd $BUILD_DIR_LIBWRT
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: 克隆ImmortalWrt源码
+      run: |
+        git clone -b $REPO_BRANCH_IMMWRT $REPO_URL_IMMWRT $BUILD_DIR_IMMWRT
+        cd $BUILD_DIR_IMMWRT
+        ./scripts/feeds update -a
+        ./scripts/feeds install -a
+
+    - name: 添加kenzok8/small-package软件源
+      run: |
+        cd $BUILD_DIR_LIBWRT
+        echo "src-git small https://github.com/kenzok8/small-package" >> feeds.conf.default
+        ./scripts/feeds update small
+        ./scripts/feeds install -a -p small
+        
+        cd ../$BUILD_DIR_IMMWRT
+        echo "src-git small https://github.com/kenzok8/small-package" >> feeds.conf.default
+        ./scripts/feeds update small
+        ./scripts/feeds install -a -p small
+
+    - name: 添加custom_packages.conf中的自定义软件包
+      run: |
+        cd $BUILD_DIR_LIBWRT
+        while IFS= read -r line; do
+          [[ $line =~ ^#.*$ || -z $line ]] && continue
+          read -r repo dir branch <<< "$line"
+          if [ -n "$branch" ]; then
+            git clone -b "$branch" "$repo" "feeds/packages/$dir"
+          else
+            git clone "$repo" "feeds/packages/$dir"
+          fi
+        done < ../custom_packages.conf
+        ./scripts/feeds install -a
+        
+        cd ../$BUILD_DIR_IMMWRT
+        while IFS= read -r line; do
+          [[ $line =~ ^#.*$ || -z $line ]] && continue
+          read -r repo dir branch <<< "$line"
+          if [ -n "$branch" ]; then
+            git clone -b "$branch" "$repo" "feeds/packages/$dir"
+          else
+            git clone "$repo" "feeds/packages/$dir"
+          fi
+        done < ../custom_packages.conf
+        ./scripts/feeds install -a
+
+    - name: 配置LiBwrt
+      run: |
+        cd $BUILD_DIR_LIBWRT
+        cp ../Arthur_Athena_libwrt.config .config
+        make defconfig
+
+    - name: 配置ImmortalWrt
+      run: |
+        cd $BUILD_DIR_IMMWRT
+        cp ../Arthur_Athena_immwrt.config .config
+        make defconfig
+
+    - name: 编译LiBwrt固件
+      run: |
+        cd $BUILD_DIR_LIBWRT
+        echo -e "\033[32m开始编译LiBwrt固件...\033[0m"
+        make -j$(nproc) || {
+          echo -e "\033[31mLiBwrt固件编译失败\033[0m"
+          exit 1
+        }
+        echo -e "\033[32mLiBwrt固件编译完成\033[0m"
+
+    - name: 编译ImmortalWrt固件
+      run: |
+        cd $BUILD_DIR_IMMWRT
+        echo -e "\033[32m开始编译ImmortalWrt固件...\033[0m"
+        make -j$(nproc) || {
+          echo -e "\033[31mImmortalWrt固件编译失败\033[0m"
+          exit 1
+        }
+        echo -e "\033[32mImmortalWrt固件编译完成\033[0m"
+
+    - name: Get Kernel Version
+      run: |
+        # 获取内核版本
+        for build_dir in ${{ env.BUILD_DIR_LIBWRT }} ${{ env.BUILD_DIR_IMMWRT }}; do
+          KVER=$(find ./$build_dir/dl -maxdepth 1 -name "linux-[4-6]\.*" 2>/dev/null | sort -r | head -n 1 | grep -oE "[4-6]\.[0-9]{1,3}\.[0-9]{1,3}" || echo "unknown")
+          echo "${build_dir}_KVER=$KVER" >> $GITHUB_ENV
+        done
+
+    - name: Delete Old Cache
+      run: |
+        # 获取缓存列表并删除
+        gh cache list --key ubuntu-22.04-${{ hashFiles('**/repo_flag') }}- --json key --jq '.[] | .key' 2>/dev/null | while read -r key; do
+          gh cache delete "$key" 2>/dev/null || true
+        done
+        # 输出缓存状态
+        echo "========cache status========"
+        for build_dir in ${{ env.BUILD_DIR_LIBWRT }} ${{ env.BUILD_DIR_IMMWRT }}; do
+          if [ -d "./$build_dir/.ccache" ]; then
+            echo "$build_dir ccache: $(du -sh ./$build_dir/.ccache 2>/dev/null | cut -f 1)"
+          fi
+          if [ -d "./$build_dir/staging_dir" ]; then
+            echo "$build_dir staging: $(du -sh ./$build_dir/staging_dir 2>/dev/null | cut -f 1)"
+          fi
+        done
+
+    - name: 生成Release说明
+      id: release_notes
+      run: |
+        # 使用前面获取的内核版本
+        LIBWRT_KVER=${{ env.libwrt-k612_KVER }}
+        IMMWRT_KVER=${{ env.imm-nss_KVER }}
+        
+        cat > release_notes.txt << EOF
+        ## 固件信息
+        - **Kernel**: ${LIBWRT_KVER:-6.12} (LiBwrt) / ${IMMWRT_KVER:-6.6} (ImmortalWrt)
+        - **具体安装的ipk见config文件**
+        - **初始WIFI密码**: 123456
+        - **初始路由IP**: 192.168.111.1
+
+        EOF
+        echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+        cat release_notes.txt >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+
+    - name: 上传LiBwrt固件产物
+      uses: actions/upload-artifact@v4
+      with:
+        name: libwrt-firmware-${{ github.run_number }}
+        path: ${{ env.BUILD_DIR_LIBWRT }}/bin/targets/*/*/
+
+    - name: 上传ImmortalWrt固件产物
+      uses: actions/upload-artifact@v4
+      with:
+        name: immortalwrt-firmware-${{ github.run_number }}
+        path: ${{ env.BUILD_DIR_IMMWRT }}/bin/targets/*/*/
+
+    - name: 创建Release发布
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ github.run_number }}
+        name: OpenWrt固件自动编译(${{ github.run_number }})-$(date +'%Y%m%d-%H%M')
+        body: ${{ steps.release_notes.outputs.release_notes }}
+        files: |
+          ${{ env.BUILD_DIR_LIBWRT }}/bin/targets/*/*/*
+          ${{ env.BUILD_DIR_IMMWRT }}/bin/targets/*/*/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
