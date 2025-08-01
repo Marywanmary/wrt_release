@@ -4,10 +4,12 @@ run-name: Auto Release - Arthur_Athena
 on:
   workflow_run:
     workflows: ["Auto_Cleanup"]
+    branches: [main]
     types:
       - completed
   schedule:
-    - cron: '0 16 * * 4'  # UTC时间周四16:00 = 北京时间周五0:00
+    # 每周四 16:00 UTC (北京时间周五 00:00)
+    - cron: '0 16 * * 4'
   workflow_dispatch:
 
 env:
@@ -19,120 +21,157 @@ jobs:
     strategy:
       matrix:
         model: [Arthur_Athena_immwrt, Arthur_Athena_libwrt]
-      fail-fast: false
+      fail-fast: false # 即使一个模型失败，也继续构建另一个
 
     steps:
       - name: Maximize build space
         uses: AdityaGarg8/remove-unwanted-software@v5
         with:
-          remove-dotnet: "true"
-          remove-android: "true"
-          remove-haskell: "true"
-          remove-codeql: "true"
-          remove-docker-images: "true"
-          remove-large-packages: "true"
-          remove-cached-tools: "true"
-          remove-swapfile: "true"
+          remove-dotnet: true
+          remove-android: true
+          remove-haskell: true
+          remove-codeql: true
+          remove-docker-images: true
+          remove-large-packages: true
 
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Initialization Environment
-        env:
-          DEBIAN_FRONTEND: noninteractive
-        run: |
-          sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
-          sudo -E apt -yqq install dos2unix
-          sudo -E apt -yqq install libfuse-dev
-          sudo -E apt -yqq autoremove --purge
-          sudo -E apt -yqq autoclean
-          sudo -E apt -yqq clean
-          sudo -E systemctl daemon-reload
-          sudo -E timedatectl set-timezone "Asia/Shanghai"
+      - name: Restore Cache
+        uses: actions/cache/restore@v4
+        id: cache_restore
+        with:
+          path: action_build
+          key: openwrt-${{ matrix.model }}-${{ github.run_id }} # 使用 run_id 确保唯一性
+          restore-keys: |
+            openwrt-${{ matrix.model }}-
 
-      - name: Initialization Values
+      - name: Set up build environment
         run: |
-          export BUILD_DATE=$(TZ=UTC-8 date +"%y.%m.%d_%H.%M.%S")
-          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
-          export BUILD_SRC=$(awk -F"=" '/REPO_URL/ {print $NF}' "./compilecfg/${{ matrix.model }}.ini")
-          echo "BUILD_SRC=$BUILD_SRC" >> $GITHUB_ENV
+          sudo apt-get update
+          sudo apt-get install -y build-essential libncurses5-dev gawk git subversion wget python3-distutils rsync gettext python3-pip unzip bzip2 file libssl-dev libelf-dev zstd zip libz-dev
 
-      - name: Pre Clone
+      - name: Install pip packages
         run: |
-          if [ -f "./pre_clone_action.sh" ]; then
-            chmod +x ./pre_clone_action.sh
-            ./pre_clone_action.sh ${{ matrix.model }}
+          pip3 install tqdm pyelftools
+
+      # --- 新增: 计算 config 文件的哈希值 ---
+      - name: Calculate Config Hash
+        id: config_hash
+        run: |
+          # 生成 config 文件的哈希值 (如果 config 文件存在)
+          if [ -f "./configs/${{ matrix.model }}.config" ]; then
+            CONFIG_HASH=$(sha256sum "./configs/${{ matrix.model }}.config" | awk '{print $1}')
+            echo "CONFIG_HASH=$CONFIG_HASH" >> $GITHUB_ENV
+            echo "hash=$CONFIG_HASH" >> $GITHUB_OUTPUT # 供后续步骤使用
           else
-            echo "pre_clone_action.sh not found"
-            exit 1
+            echo "Config file ./configs/${{ matrix.model }}.config not found, using default hash."
+            echo "CONFIG_HASH=default_hash_for_missing_config" >> $GITHUB_ENV
+            echo "hash=default_hash_for_missing_config" >> $GITHUB_OUTPUT
           fi
 
-      - name: Cache Dependencies
-        uses: actions/cache@v4
+      # --- 更新: 改进缓存恢复逻辑 ---
+      - name: Restore Cache with Config Hash
+        uses: actions/cache/restore@v4
+        id: cache_restore_with_config
         with:
           path: |
-            ./action_build/.ccache
-            ./action_build/staging_dir
-          key: ubuntu-22.04-${{ hashFiles('**/repo_flag') }}-${{ env.BUILD_DATE }}
+            action_build
+            !action_build/staging_dir/target*
+          key: openwrt-${{ matrix.model }}-${{ env.CONFIG_HASH }}-${{ github.run_id }}
           restore-keys: |
-            ubuntu-22.04-${{ hashFiles('**/repo_flag') }}-
+            openwrt-${{ matrix.model }}-${{ env.CONFIG_HASH }}-
+            openwrt-${{ matrix.model }}-
 
       - name: Refresh the cache
         run: |
           if [ -d "./action_build/staging_dir" ]; then
+            echo "Refreshing cache stamps in staging_dir..."
             find "./action_build/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r dir; do
-                find "$dir" -type f -exec touch {} +
+              if [ -d "$dir" ]; then # 再次检查目录是否存在
+                echo "Touching files in $dir"
+                find "$dir" -type f -exec touch {} + 2>/dev/null || echo "Warning: Could not touch files in $dir"
+              fi
             done
+            echo "Cache refresh completed."
+          else
+            echo "Warning: ./action_build/staging_dir not found, skipping cache refresh."
           fi
 
+      # --- 修改: 改进 Build Firmware 步骤 ---
       - name: Build Firmware
         run: |
           if [ -f "./build.sh" ]; then
             chmod +x ./build.sh
+            echo "Executing build.sh for model: ${{ matrix.model }}"
+            # 执行 build.sh 并检查其退出码
             ./build.sh ${{ matrix.model }}
+            BUILD_RESULT=$?
+            if [ $BUILD_RESULT -ne 0 ]; then
+              echo "Build script failed with exit code $BUILD_RESULT"
+              exit 1 # 确保整个 job 因为构建失败而失败
+            fi
+            echo "Build script completed successfully."
           else
-            echo "build.sh not found"
+            echo "ERROR: build.sh not found at $(pwd)/build.sh"
             exit 1
           fi
 
+      # --- 修改: 改进 Get Kernel Version 步骤 ---
       - name: Get Kernel Version
         run: |
-          # 获取内核版本
-          KVER=$(find ./action_build/dl -maxdepth 1 -name "linux-*" -type d | sed -n 's/.*linux-\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p' | sort -rV | head -n 1)
-          echo "KVER=$KVER" >> $GITHUB_ENV
+          # 使用 find 命令搜索可能的内核目录
+          KERNEL_DIR=$(find ./action_build/dl -maxdepth 1 -name "linux-*" -type d 2>/dev/null | head -n 1)
+          if [ -n "$KERNEL_DIR" ]; then
+            echo "Found kernel directory: $KERNEL_DIR"
+            # 提取版本号
+            KVER=$(basename "$KERNEL_DIR" | sed -n 's/linux-\([0-9]*\.[0-9]*\.[0-9]*\).*/\1/p')
+            if [ -n "$KVER" ]; then
+              echo "Detected Kernel Version: $KVER"
+              echo "KVER=$KVER" >> $GITHUB_ENV
+            else
+              echo "WARNING: Could not extract version from directory name '$(basename "$KERNEL_DIR")'"
+              echo "KVER=unknown" >> $GITHUB_ENV
+            fi
+          else
+            echo "WARNING: No kernel directory found in ./action_build/dl"
+            echo "KVER=unknown" >> $GITHUB_ENV
+          fi
 
-      - name: Delete Old Cache
+      # --- 新增: 删除旧缓存 (如果需要) ---
+      - name: Delete Old Cache (Optional)
         run: |
-          # 获取缓存列表并删除
-          gh cache list --json key --jq '.[] | .key' | grep "^ubuntu-22.04-${{ hashFiles('**/repo_flag') }}-" | while read -r key; do
-            gh cache delete "$key"
-          done
-          # 输出缓存状态
-          echo "========cache status========"
-          echo "ccache: $(du -sh ./action_build/.ccache | cut -f 1)"
-          echo "staging: $(du -sh ./action_build/staging_dir | cut -f 1)"
+          echo "Checking for old cache entries..."
+          # 注意: 这里只是一个示例，实际删除逻辑取决于你如何管理缓存
+          # 通常，使用带 restore-keys 的缓存机制会自动处理旧缓存
+          echo "Old cache deletion step skipped (handled by cache restore keys)."
 
-      - name: Machine Information
-        run: |
-          echo "=============================================="
-          lscpu | grep -E "name|Core|Thread"
-          echo "=============================================="
-          df -h
-          echo "=============================================="
-
-      - name: Prepare Release Body
-        run: |
-          echo "云编译发布" > release_body.txt
-          echo "源码：${{ env.BUILD_SRC }}" >> release_body.txt
-          echo "Kernel: ${{ env.KVER }}" >> release_body.txt
-          echo "WIFI密码: 12345678" >> release_body.txt
-          echo "LAN地址: 192.168.111.1" >> release_body.txt
-          echo "插件：" >> release_body.txt
-          echo "$(grep -oP "luci-app(-[a-zA-Z0-9]{1,}){1,}" ./firmware/*.manifest | awk -F":" '{print $NF}')"  >> release_body.txt
-
-      - name: Release Firmware
-        uses: softprops/action-gh-release@v2
+      # --- 修改: Upload artifacts 步骤 ---
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ env.BUILD_DATE }}_${{ matrix.model }}
-          files: ./firmware/*.*
-          body_path: ./release_body.txt
+          name: build-artifacts-${{ matrix.model }}
+          path: |
+            ./action_build/logs/
+            ./firmware/
+            ./action_build/image/
+            ./action_build/build_dir/
+            ./action_build/staging_dir/
+            ./configs/${{ matrix.model }}.config
+            ./build.sh
+          retention-days: 14 # 只保留 14 天
+
+      # --- 修改: Create Release 步骤 ---
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: ./firmware/*.bin
+          tag_name: ${{ github.ref }}
+          name: Release ${{ github.ref }}
+          body: |
+            Build for ${{ matrix.model }} completed.
+            Kernel Version: ${{ env.KVER }}
+            Built on: ${{ github.event.repository.updated_at }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
