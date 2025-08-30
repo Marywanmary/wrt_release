@@ -57,20 +57,6 @@ remove_uhttpd_dependency() {
 # 应用配置文件：复制配置文件到构建目录
 \cp -f "$CONFIG_FILE" "$BASE_PATH/$BUILD_DIR/.config"
 
-# 定义一个函数：应用配置（被注释掉了，但保留了备用）
-# apply_config() {
-#    # 复制基础配置文件
-#    \cp -f "$CONFIG_FILE" "$BASE_PATH/$BUILD_DIR/.config"
-#    
-#    # 如果是 ipq60xx 或 ipq807x 平台，则追加 NSS 配置
-#    if grep -qE "(ipq60xx|ipq807x)" "$BASE_PATH/$BUILD_DIR/.config"; then
-#        cat "$BASE_PATH/deconfig/nss.config" >> "$BASE_PATH/$BUILD_DIR/.config"
-#    fi
-#
-#    # 追加代理配置
-#    cat "$BASE_PATH/deconfig/proxy.config" >> "$BASE_PATH/$BUILD_DIR/.config"
-#}
-
 # 从 INI 文件中读取仓库 URL
 REPO_URL=$(read_ini_by_key "REPO_URL")
 
@@ -86,13 +72,11 @@ BUILD_DIR=$(read_ini_by_key "BUILD_DIR")
 # 从 INI 文件中读取提交哈希值
 COMMIT_HASH=$(read_ini_by_key "COMMIT_HASH")
 
-# 如果 action_build 目录存在，则使用 action_build 作为构建目录
-if [[ -d $BASE_PATH/action_build ]]; then
-    BUILD_DIR="action_build"
-fi
+# 使用统一的构建目录
+BUILD_DIR="$BASE_PATH/action_build"
 
 # 调用 update.sh 脚本更新源码仓库
-$BASE_PATH/scripts/update01.sh "$REPO_URL" "$REPO_BRANCH" "$BASE_PATH/$BUILD_DIR" "$COMMIT_HASH"
+$BASE_PATH/scripts/update05.sh "$REPO_URL" "$REPO_BRANCH" "$BASE_PATH/$BUILD_DIR" "$COMMIT_HASH"
 
 # 调用 remove_uhttpd_dependency 函数移除依赖
 remove_uhttpd_dependency
@@ -133,18 +117,54 @@ make download -j$(($(nproc) * 2))
 # 如果编译失败，则回退到单线程模式
 make -j$(($(nproc) + 1)) || make -j1 V=s
 
-# 创建固件输出目录
-FIRMWARE_DIR="$BASE_PATH/firmware"
+# 创建设备型号特定的固件输出目录
+FIRMWARE_DIR="$BASE_PATH/firmware_$Dev"
 \rm -rf "$FIRMWARE_DIR"
 mkdir -p "$FIRMWARE_DIR"
 
-# 查找并复制所有固件相关文件到输出目录
-find "$TARGET_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" \) -exec cp -f {} "$FIRMWARE_DIR/" \;
+# 解析设备型号：芯片组_openwrt分支缩写_配置
+CHIPSET=$(echo "$Dev" | cut -d'_' -f1)
+BRANCH=$(echo "$Dev" | cut -d'_' -f2)
+CONFIG=$(echo "$Dev" | cut -d'_' -f3)
 
-# 删除 Packages.manifest 文件（如果有）
-\rm -f "$BASE_PATH/firmware/Packages.manifest" 2>/dev/null
+# 生成设备前缀（用于配置文件重命名）
+DEVICE_PREFIX="${CHIPSET}-${BRANCH}-${CONFIG}"
 
-# 如果 action_build 目录存在，则清理构建缓存
-if [[ -d $BASE_PATH/action_build ]]; then
+# 查找并复制所有固件相关文件到输出目录，并重命名
+find "$TARGET_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" \) | while read -r file; do
+    filename=$(basename "$file")
+    extension="${filename##*.}"
+    
+    # 只对.bin文件应用重命名规则
+    if [[ "$extension" == "bin" ]]; then
+        # 提取固件类型（factory/sysupgrade等）
+        firmware_type=$(echo "$filename" | grep -oE "(factory|sysupgrade|initramfs)" | head -1)
+        
+        # 提取设备型号部分（如 jdcloud_re-cs-02 或 jdcloud_re-ss-01）
+        device_model=$(echo "$filename" | sed -E "s/.*$CHIPSET-([^-]+)-[^-]+-$firmware_type\.bin/\1/")
+        
+        # 构建新文件名：分支-设备型号-固件类型-配置.bin
+        new_filename="${BRANCH}-${device_model}-${firmware_type}-${CONFIG}.bin"
+    else
+        # 非.bin文件保持原名
+        new_filename="$filename"
+    fi
+    
+    # 复制文件到输出目录（使用新文件名）
+    cp -f "$file" "$FIRMWARE_DIR/$new_filename"
+done
+
+# 复制并重命名配置文件
+for config_file in ".config" "config.buildinfo" "manifest" "Packages.manifest"; do
+    src_path="$BASE_PATH/$BUILD_DIR/$config_file"
+    if [[ -f "$src_path" ]]; then
+        # 生成新文件名：设备前缀.原文件名
+        new_filename="${DEVICE_PREFIX}.${config_file}"
+        cp -f "$src_path" "$FIRMWARE_DIR/$new_filename"
+    fi
+done
+
+# 如果是定时触发（批量编译），不清理构建目录，以便共享缓存
+if [[ "$GITHUB_EVENT_NAME" != "schedule" ]]; then
     make clean
 fi

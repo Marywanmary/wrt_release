@@ -1,0 +1,140 @@
+# 脚本、配置、INI编号01，仅改名，做必要的路径修改。
+# 脚本、配置、INI编号02，在build.sh修改，改名后输出固件和配置文件
+# 脚本、配置、INI编号03，修改工作流，定时以矩阵批量编译, 设置不同的TAG发布。
+name: Release IPQ-03
+run-name: Release - ${{ inputs.model }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        required: true
+        description: Device Model
+        type: choice
+        default: ipq60xx_immwrt_Pro
+        options:
+          - ipq60xx_immwrt_Pro
+          - ipq60xx_immwrt_Max
+          - ipq60xx_immwrt_Ultra
+          - ipq60xx_libwrt_Pro
+          - ipq60xx_libwrt_Max
+          - ipq60xx_libwrt_Ultra
+  # 添加定时触发：北京时间每周五0点（UTC时间周四16点）
+  schedule:
+    - cron: '0 16 * * 4'  # 每周四16:00 UTC（北京时间周五0:00）
+
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-24.04]
+        # 添加所有设备型号的矩阵
+        model:
+          - ipq60xx_immwrt_Pro
+          - ipq60xx_immwrt_Max
+          - ipq60xx_immwrt_Ultra
+          - ipq60xx_libwrt_Pro
+          - ipq60xx_libwrt_Max
+          - ipq60xx_libwrt_Ultra
+      # 设置最大并行数，避免同时运行过多任务
+      max-parallel: 3
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Free disk space
+        uses: sbwml/actions@free-disk
+
+      - name: Build System Setup
+        run: |
+          sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
+          sudo apt-get -yqq update
+          sudo apt-get -yqq install dos2unix libfuse-dev build-essential libncurses5-dev zlib1g-dev gawk git gettext libssl-dev xsltproc unzip python3-setuptools python3-pip
+          sudo apt-get -yqq autoremove --purge
+          sudo apt-get -yqq autoclean
+          sudo apt-get -yqq clean
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set Execute Permissions
+        run: |
+          echo "=== 设置执行权限 ==="
+          find . -name "*.sh" -type f -exec sh -c 'head -n1 "$1" | grep -q "^#!/" && chmod +x "$1"' _ {} \;
+
+      - name: Set Build Date and Timezone
+        run: |
+          sudo -E timedatectl set-timezone "Asia/Shanghai"
+          export BUILD_DATE=$(TZ=UTC-8 date +"%y.%m.%d_%H.%M.%S")
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
+          export BUILD_SRC=$(awk -F"=" '/REPO_URL/ {print $NF}' "./compilecfg/${{ matrix.model }}.ini")
+          echo "BUILD_SRC=$BUILD_SRC" >> $GITHUB_ENV
+
+      - name: Pre Clone
+        run: ./pre_clone_action03.sh ${{ matrix.model }}
+
+      - name: Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ./action_build_${{ matrix.model }}/.ccache
+            ./action_build_${{ matrix.model }}/staging_dir
+          # 为每个设备型号创建独立的缓存键
+          key: ${{ matrix.os }}-${{ matrix.model }}-${{ hashFiles('**/repo_flag_${{ matrix.model }}') }}-${{ env.BUILD_DATE }}
+          restore-keys: |
+            ${{ matrix.os }}-${{ matrix.model }}-${{ hashFiles('**/repo_flag_${{ matrix.model }}') }}-
+
+      - name: Refresh the cache
+        run: |
+          if [ -d "./action_build_${{ matrix.model }}/staging_dir" ]; then
+            find "./action_build_${{ matrix.model }}/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r dir; do
+                find "$dir" -type f -exec touch {} +
+            done
+          fi
+
+      - name: Build Firmware
+        run: ./build03.sh ${{ matrix.model }}
+
+      - name: Get Kernel Version
+        run: |
+          # 获取内核版本
+          echo "KVER=$(find ./action_build_${{ matrix.model }}/dl -maxdepth 1 -name "linux-[4-6]\.*" | sort -r | head -n 1 | grep -oE "[4-6]\.[0-9]{1,3}\.[0-9]{1,3}")" >> $GITHUB_ENV
+
+      - name: Delete Old Cache
+        run: |
+          # 获取缓存列表并删除
+          gh cache list --key ${{ matrix.os }}-${{ matrix.model }}-${{ hashFiles('**/repo_flag_${{ matrix.model }}') }}- --json key --jq '.[] | .key' | while read -r key; do
+            gh cache delete "$key"
+          done
+          # 输出缓存状态
+          echo "========cache status========"
+          echo "ccache: $(du -sh ./action_build_${{ matrix.model }}/.ccache | cut -f 1)"
+          echo "staging: $(du -sh ./action_build_${{ matrix.model }}/staging_dir | cut -f 1)"
+
+      - name: Machine Information
+        run: |
+          echo "=============================================="
+          lscpu | grep -E "name|Core|Thread"
+          echo "=============================================="
+          df -h
+          echo "=============================================="
+
+      - name: Prepare Release Body
+        run: |
+          echo "云编译发布" > release_body.txt
+          echo "源码：${{ env.BUILD_SRC }}" >> release_body.txt
+          echo "Kernel: ${{ env.KVER }}" >> release_body.txt
+          echo "WIFI密码: 12345678" >> release_body.txt
+          echo "LAN地址: 192.168.111.1" >> release_body.txt
+          echo "插件：" >> release_body.txt
+          echo "$(grep -oP "luci-app(-[a-zA-Z0-9]{1,}){1,}" ./firmware_${{ matrix.model }}/*.manifest | awk -F":" '{print $NF}')"  >> release_body.txt
+
+      - name: Release Firmware
+        uses: softprops/action-gh-release@v2
+        with:
+          # 为每个设备型号创建独立的发布标签
+          tag_name: ${{ env.BUILD_DATE }}_${{ matrix.model }}
+          files: ./firmware_${{ matrix.model }}/*.*
+          body_path: ./release_body.txt

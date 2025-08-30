@@ -78,7 +78,7 @@ if [[ -d $BASE_PATH/action_build ]]; then
 fi
 
 # 调用 update.sh 脚本更新源码仓库
-$BASE_PATH/update02.sh "$REPO_URL" "$REPO_BRANCH" "$BASE_PATH/$BUILD_DIR" "$COMMIT_HASH"
+$BASE_PATH/scripts/update02.sh "$REPO_URL" "$REPO_BRANCH" "$BASE_PATH/$BUILD_DIR" "$COMMIT_HASH"
 
 # 调用 remove_uhttpd_dependency 函数移除依赖
 remove_uhttpd_dependency
