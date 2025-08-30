@@ -5,8 +5,6 @@ run-name: Release - ${{ inputs.model }}
 on:
   workflow_dispatch:
   workflow_call:
-  schedule:
-    - cron: 0 16 * * 4
     inputs:
       model:
         required: true
@@ -38,15 +36,20 @@ jobs:
       - name: Build System Setup
         run: |
           sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
-          sudo -E apt -yqq install dos2unix
-          sudo -E apt -yqq install libfuse-dev
-          sudo -E apt -yqq autoremove --purge
-          sudo -E apt -yqq autoclean
-          sudo -E apt -yqq clean
-          sudo -E systemctl daemon-reload
+          sudo apt-get -yqq update
+          sudo apt-get -yqq install dos2unix libfuse-dev build-essential libncurses5-dev zlib1g-dev gawk git gettext libssl-dev xsltproc unzip python3-setuptools python3-pip
+          sudo apt-get -yqq autoremove --purge
+          sudo apt-get -yqq autoclean
+          sudo apt-get -yqq clean
+          sudo systemctl daemon-reload
 
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Set Execute Permissions
+        run: |
+          echo "=== 设置执行权限 ==="
+          find . -name "*.sh" -type f -exec sh -c 'head -n1 "$1" | grep -q "^#!/" && chmod +x "$1"' _ {} \;
 
       - name: Set Build Date and Timezone
         run: |
@@ -117,6 +120,5 @@ jobs:
       - name: Release Firmware
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.BUILD_DATE }}_${{ inputs.model }}
-          files: ${{ inputs.model == 'n1_immwrt' && env.PACKAGED_OUTPUTPATH || './firmware' }}/*.*
+          echo "FIRMWARE_PATH=./firmware" >> $GITHUB_ENV
           body_path: ./release_body.txt
