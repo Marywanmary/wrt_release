@@ -147,7 +147,7 @@ jobs:
           echo "$(grep -oP "luci-app(-[a-zA-Z0-9]{1,}){1,}" ./firmware_${{ matrix.model }}/*.manifest | awk -F":" '{print $NF}')"  >> release_body.txt
 
       - name: Upload Artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: firmware-${{ matrix.model }}
           path: ./firmware_${{ matrix.model }}/*.*
@@ -158,7 +158,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: all-firmware
 
@@ -196,7 +196,7 @@ jobs:
         model: ${{ fromJson(needs.determine-models.outputs.models) }}
     steps:
       - name: Download artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: firmware-${{ matrix.model }}
           path: firmware

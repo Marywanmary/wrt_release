@@ -135,7 +135,7 @@ jobs:
 
       - name: Upload Artifacts for Schedule
         if: ${{ github.event_name == 'schedule' }}
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: firmware-${{ matrix.model }}
           path: ./firmware/*.*
@@ -154,7 +154,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: all-firmware
 
