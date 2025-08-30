@@ -1,4 +1,5 @@
 # 脚本、配置、INI编号01，仅改名，做必要的路径修改。
+
 name: Release IPQ-01
 run-name: Release - ${{ inputs.model }}
 
