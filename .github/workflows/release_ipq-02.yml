@@ -1,5 +1,6 @@
 # 脚本、配置、INI编号01，仅改名，做必要的路径修改。
-name: Release IPQ-01
+# 脚本、配置、INI编号02，仅改名，做必要的路径修改。
+name: Release IPQ-02
 run-name: Release - ${{ inputs.model }}
 
 on:
@@ -59,7 +60,7 @@ jobs:
           echo "BUILD_SRC=$BUILD_SRC" >> $GITHUB_ENV
 
       - name: Pre Clone
-        run: ./pre_clone_action01.sh ${{ inputs.model }}
+        run: ./pre_clone_action02.sh ${{ inputs.model }}
 
       - name: Cache Dependencies
         uses: actions/cache@v4
@@ -80,7 +81,7 @@ jobs:
           fi
 
       - name: Build Firmware
-        run: ./build01.sh ${{ inputs.model }}
+        run: ./build02.sh ${{ inputs.model }}
 
       - name: Get Kernel Version
         run: |
