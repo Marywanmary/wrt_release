@@ -1,5 +1,5 @@
 # 脚本、配置、INI编号01，仅改名，做必要的路径修改。
-# 脚本、配置、INI编号02，仅改名，做必要的路径修改。
+# 脚本、配置、INI编号02，在build.sh修改，改名后输出固件和配置文件
 name: Release IPQ-02
 run-name: Release - ${{ inputs.model }}
 
