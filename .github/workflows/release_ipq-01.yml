@@ -4,7 +4,6 @@ run-name: Release - ${{ inputs.model }}
 
 on:
   workflow_dispatch:
-  workflow_call:
     inputs:
       model:
         required: true
