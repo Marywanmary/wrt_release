@@ -60,7 +60,7 @@ jobs:
           echo "BUILD_SRC=$BUILD_SRC" >> $GITHUB_ENV
 
       - name: Pre Clone
-        run: ./pre_clone_action02.sh ${{ inputs.model }}
+        run: ./scripts/pre_clone_action02.sh ${{ inputs.model }}
 
       - name: Cache Dependencies
         uses: actions/cache@v4
@@ -81,7 +81,7 @@ jobs:
           fi
 
       - name: Build Firmware
-        run: ./build02.sh ${{ inputs.model }}
+        run: ./scripts/build02.sh ${{ inputs.model }}
 
       - name: Get Kernel Version
         run: |

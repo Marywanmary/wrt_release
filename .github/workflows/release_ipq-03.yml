@@ -1,5 +1,7 @@
 # 脚本、配置、INI编号01，仅改名，做必要的路径修改。
-name: Release IPQ-01
+# 脚本、配置、INI编号02，在build.sh修改，改名后输出固件和配置文件
+# 脚本、配置、INI编号03，修改工作流，定时以矩阵批量编译。
+name: Release IPQ-03
 run-name: Release - ${{ inputs.model }}
 
 on:
@@ -17,6 +19,9 @@ on:
           - ipq60xx_libwrt_Pro
           - ipq60xx_libwrt_Max
           - ipq60xx_libwrt_Ultra
+  # 添加定时触发：北京时间每周五0点（UTC时间周四16点）
+  schedule:
+    - cron: '0 16 * * 4'  # 每周四16:00 UTC（北京时间周五0:00）
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -26,6 +31,16 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-24.04]
+        # 添加所有设备型号的矩阵
+        model:
+          - ipq60xx_immwrt_Pro
+          - ipq60xx_immwrt_Max
+          - ipq60xx_immwrt_Ultra
+          - ipq60xx_libwrt_Pro
+          - ipq60xx_libwrt_Max
+          - ipq60xx_libwrt_Ultra
+      # 设置最大并行数，避免同时运行过多任务
+      max-parallel: 3
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -55,11 +70,11 @@ jobs:
           sudo -E timedatectl set-timezone "Asia/Shanghai"
           export BUILD_DATE=$(TZ=UTC-8 date +"%y.%m.%d_%H.%M.%S")
           echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
-          export BUILD_SRC=$(awk -F"=" '/REPO_URL/ {print $NF}' "./compilecfg/${{ inputs.model }}.ini")
+          export BUILD_SRC=$(awk -F"=" '/REPO_URL/ {print $NF}' "./compilecfg/${{ matrix.model }}.ini")
           echo "BUILD_SRC=$BUILD_SRC" >> $GITHUB_ENV
 
       - name: Pre Clone
-        run: ./scripts/pre_clone_action01.sh ${{ inputs.model }}
+        run: ./scripts/pre_clone_action03.sh ${{ matrix.model }}
 
       - name: Cache Dependencies
         uses: actions/cache@v4
@@ -67,9 +82,10 @@ jobs:
           path: |
             ./action_build/.ccache
             ./action_build/staging_dir
-          key: ${{ matrix.os }}-${{ hashFiles('**/repo_flag') }}-${{ env.BUILD_DATE }}
+          # 为每个设备型号创建独立的缓存键
+          key: ${{ matrix.os }}-${{ matrix.model }}-${{ hashFiles('**/repo_flag') }}-${{ env.BUILD_DATE }}
           restore-keys: |
-            ${{ matrix.os }}-${{ hashFiles('**/repo_flag') }}-
+            ${{ matrix.os }}-${{ matrix.model }}-${{ hashFiles('**/repo_flag') }}-
 
       - name: Refresh the cache
         run: |
@@ -80,7 +96,7 @@ jobs:
           fi
 
       - name: Build Firmware
-        run: ./scripts/build01.sh ${{ inputs.model }}
+        run: ./scripts/build02.sh ${{ matrix.model }}
 
       - name: Get Kernel Version
         run: |
@@ -90,7 +106,7 @@ jobs:
       - name: Delete Old Cache
         run: |
           # 获取缓存列表并删除
-          gh cache list --key ${{ matrix.os }}-${{ hashFiles('**/repo_flag') }}- --json key --jq '.[] | .key' | while read -r key; do
+          gh cache list --key ${{ matrix.os }}-${{ matrix.model }}-${{ hashFiles('**/repo_flag') }}- --json key --jq '.[] | .key' | while read -r key; do
             gh cache delete "$key"
           done
           # 输出缓存状态
@@ -119,6 +135,7 @@ jobs:
       - name: Release Firmware
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.BUILD_DATE }}_${{ inputs.model }}
+          # 为每个设备型号创建独立的发布标签
+          tag_name: ${{ env.BUILD_DATE }}_${{ matrix.model }}
           files: ./firmware/*.*
           body_path: ./release_body.txt
