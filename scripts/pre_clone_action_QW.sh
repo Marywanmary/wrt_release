@@ -3,8 +3,10 @@ set -e
 BASE_PATH=$(cd $(dirname $0) && pwd)
 Dev=$1
 Build_Mod=$2
-CONFIG_FILE="$BASE_PATH/deconfig/$Dev.config"
-INI_FILE="$BASE_PATH/compilecfg/$Dev.ini"
+#CONFIG_FILE="$BASE_PATH/deconfig/$Dev.config"
+#INI_FILE="$BASE_PATH/compilecfg/$Dev.ini"
+CONFIG_FILE="$(dirname "$BASE_PATH")/compilecfg/$Dev.config"  # 输出: /project_root/compilecfg/abc.config
+INI_FILE="$(dirname "$BASE_PATH")/compilecfg/$Dev.ini"  # 输出: /project_root/compilecfg/abc.ini
 
 # --- 新增：日志函数 ---
 log() {
