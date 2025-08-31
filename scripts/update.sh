@@ -12,7 +12,7 @@ error_handler() {
 # 设置trap捕获ERR信号
 trap 'error_handler' ERR
 
-BASE_PATH=$(cd $(dirname $0) && pwd)
+BASE_PATH=$(cd $(dirname $0)../ && pwd)
 
 REPO_URL=$1
 REPO_BRANCH=$2
@@ -23,7 +23,7 @@ FEEDS_CONF="feeds.conf.default"
 GOLANG_REPO="https://github.com/sbwml/packages_lang_golang"
 GOLANG_BRANCH="25.x"
 THEME_SET="argon"
-LAN_ADDR="192.168.1.1"
+LAN_ADDR="192.168.111.1"
 
 clone_repo() {
     if [[ ! -d $BUILD_DIR ]]; then
