@@ -2,7 +2,7 @@
 # 工作流合并发布Release。
 # build_Chatz.sh负责改名，pre_clone_action_Chatz.sh并入build_Chatz.sh。
 
-name: Release-IPQ-Auto-Chatz
+name: Release-IPQ-Combine-Chatz
 run-name: Release - ${{ inputs.model || 'All Devices' }}
 
 on:
