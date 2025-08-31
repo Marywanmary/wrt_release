@@ -72,7 +72,7 @@ fi
 
 # --- 调用 update.sh ---
 log "Calling update.sh..."
-$BASE_PATH/update.sh "$REPO_URL" "$REPO_BRANCH" "$BASE_PATH/$BUILD_DIR" "$COMMIT_HASH"
+$BASE_PATH/scripts/update.sh "$REPO_URL" "$REPO_BRANCH" "$BASE_PATH/$BUILD_DIR" "$COMMIT_HASH"
 
 # --- 应用配置 ---
 log "Applying configuration..."
