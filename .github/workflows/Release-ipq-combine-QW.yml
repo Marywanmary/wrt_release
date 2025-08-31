@@ -9,7 +9,7 @@ on:
     inputs:
       model:
         required: false
-        description: Device Model (leave empty or select "ALL_DEVICES" to build all devices)
+        description: Device Model (选择 "ALL_DEVICES" 编译所有设备)
         type: choice
         default: ALL_DEVICES  # 默认编译所有设备
         options:
@@ -48,7 +48,7 @@ jobs:
         uses: sbwml/actions@free-disk
       - name: Build System Setup
         run: |
-          sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh )'
+          sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh   )'
           sudo -E apt -yqq install dos2unix
           sudo -E apt -yqq install libfuse-dev
           sudo -E apt -yqq autoremove --purge
@@ -71,6 +71,12 @@ jobs:
           echo "CURRENT_MODEL=$CURRENT_MODEL" >> $GITHUB_ENV
           export BUILD_SRC=$(awk -F"=" '/REPO_URL/ {print $NF}' "./compilecfg/$CURRENT_MODEL.ini")
           echo "BUILD_SRC=$BUILD_SRC" >> $GITHUB_ENV
+      - name: Set Execute Permissions
+        run: |
+          echo "=== 设置执行权限 ==="
+          # 为 scripts 目录下的所有 .sh 文件设置执行权限
+          find ./scripts -name "*.sh" -type f -exec chmod +x {} \;
+          echo "执行权限设置完成"
       - name: Pre Clone
         run: ./scripts/pre_clone_action_QW.sh ${{ env.CURRENT_MODEL }} # <-- 修改为 ./scripts/...
       - name: Cache Dependencies
@@ -79,9 +85,9 @@ jobs:
           path: |
             ./action_build/.ccache
             ./action_build/staging_dir
-          key: ${{ matrix.os }}-${{ hashFiles('**/repo_flag') }}-${{ env.BUILD_DATE }}-${{ env.CURRENT_MODEL }}
+          key: ${{ matrix.os }}-${{ hashFiles('**/repo_flag') }}-${{ env.BUILD_DATE }}
           restore-keys: |
-            ${{ matrix.os }}-${{ hashFiles('**/repo_flag') }}-${{ env.CURRENT_MODEL }}-
+            ${{ matrix.os }}-${{ hashFiles('**/repo_flag') }}-
       - name: Refresh the cache
         run: |
           if [ -d "./action_build/staging_dir" ]; then
@@ -98,7 +104,7 @@ jobs:
       - name: Delete Old Cache
         run: |
           # 获取缓存列表并删除
-          gh cache list --key ${{ matrix.os }}-${{ hashFiles('**/repo_flag') }}-${{ env.CURRENT_MODEL }}- --json key --jq '.[] | .key' | while read -r key; do
+          gh cache list --key ${{ matrix.os }}-${{ hashFiles('**/repo_flag') }}-${{ env.BUILD_DATE }}- --json key --jq '.[] | .key' | while read -r key; do
             gh cache delete "$key"
           done
           # 输出缓存状态
@@ -132,8 +138,6 @@ jobs:
       - name: Release Firmware
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ env.BUILD_DATE }}_${{ env.CURRENT_MODEL }}
-          files: ${{ env.CURRENT_MODEL == 'n1_immwrt' && env.PACKAGED_OUTPUTPATH || './firmware' }}/*.*
+          tag_name: ${{ env.BUILD_DATE }}_combined
+          files: ./firmware/*.*
           body_path: ./release_body.txt
-
-
