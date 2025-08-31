@@ -7,9 +7,11 @@ on:
     inputs:
       model:
         required: false
-        description: Device Model (leave empty to build all devices)
+        description: Device Model (leave empty or select "ALL_DEVICES" to build all devices)
         type: choice
+        default: ALL_DEVICES  # 默认编译所有设备
         options:
+          - ALL_DEVICES
           - jdcloud_ipq60xx_immwrt
           - jdcloud_ipq60xx_libwrt
           - ipq60xx_immwrt_Pro
@@ -18,7 +20,6 @@ on:
           - ipq60xx_libwrt_Pro
           - ipq60xx_libwrt_Max
           - ipq60xx_libwrt_Ultra
-          - ALL_DEVICES
 
   schedule:
     # 每周五 00:00 北京时间 (UTC+8)
