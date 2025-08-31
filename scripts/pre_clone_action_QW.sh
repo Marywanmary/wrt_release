@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 set -e
-BASE_PATH=$(cd $(dirname $0)/.. && pwd)
+#BASE_PATH=$(cd $(dirname $0)/.. && pwd)
+BASE_PATH=$(dirname "$(readlink -f "$0")")
 Dev=$1
 Build_Mod=$2
 CONFIG_FILE="$BASE_PATH/deconfig/$Dev.config"
 INI_FILE="$BASE_PATH/compilecfg/$Dev.ini"
-#当不改变原有路径时，BASE_PATH=$(cd $(dirname $0) && pwd)
-#CONFIG_FILE="$(dirname "$BASE_PATH")/deconfig/$Dev.config"  # 输出: /project_root/compilecfg/abc.config
-#INI_FILE="$(dirname "$BASE_PATH")/compilecfg/$Dev.ini"  # 输出: /project_root/compilecfg/abc.ini
 
 # --- 新增：日志函数 ---
 log() {
