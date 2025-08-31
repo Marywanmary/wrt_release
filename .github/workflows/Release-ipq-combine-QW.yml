@@ -14,8 +14,6 @@ on:
         default: ALL_DEVICES  # 默认编译所有设备
         options:
           - ALL_DEVICES
-          - jdcloud_ipq60xx_immwrt
-          - jdcloud_ipq60xx_libwrt
           - ipq60xx_immwrt_Pro
           - ipq60xx_immwrt_Max
           - ipq60xx_immwrt_Ultra
