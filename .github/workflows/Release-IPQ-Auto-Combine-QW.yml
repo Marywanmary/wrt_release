@@ -57,15 +57,12 @@ jobs:
       - name: Define Models to Build
         run: |
           if [[ "${{ inputs.model }}" == "ALL_DEVICES" ]] || [[ "${{ inputs.model }}" == "" ]]; then
-            MODELS=("ipq60xx_immwrt_Pro" "ipq60xx_immwrt_Max" "ipq60xx_immwrt_Ultra" "ipq60xx_libwrt_Pro" "ipq60xx_libwrt_Max" "ipq60xx_libwrt_Ultra" "ipq60xx_openwrt_Pro" "ipq60xx_openwrt_Max" "ipq60xx_openwrt_Ultra")
+            echo "MODELS_JSON=[\"ipq60xx_immwrt_Pro\",\"ipq60xx_immwrt_Max\",\"ipq60xx_immwrt_Ultra\",\"ipq60xx_libwrt_Pro\",\"ipq60xx_libwrt_Max\",\"ipq60xx_libwrt_Ultra\",\"ipq60xx_openwrt_Pro\",\"ipq60xx_openwrt_Max\",\"ipq60xx_openwrt_Ultra\"]" >> $GITHUB_ENV
           else
-            MODELS=("${{ inputs.model }}")
+            echo "MODELS_JSON=[\"${{ inputs.model }}\"]" >> $GITHUB_ENV
           fi
           
-          # 将数组转换为JSON格式，以便在后续步骤中正确解析
-          MODELS_JSON=$(printf '%s\n' "${MODELS[@]}" | jq -R . | jq -s .)
-          echo "MODELS_JSON=$MODELS_JSON" >> $GITHUB_ENV
-          echo "BUILD_COUNT=${#MODELS[@]}" >> $GITHUB_ENV
+          echo "BUILD_COUNT=$(echo "${{ env.MODELS_JSON }}" | jq length)" >> $GITHUB_ENV
       - name: Build All Devices Sequentially
         run: |
           echo "开始构建 ${BUILD_COUNT} 个设备..."
