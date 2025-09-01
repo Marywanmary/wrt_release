@@ -1,162 +1,239 @@
-name: Release-IPQ-Auto-Combine-QW
-run-name: Release - ${{ inputs.model || 'All Devices' }}
-on:
-  workflow_dispatch:
-    inputs:
-      model:
-        required: false
-        description: Device Model (选择 "ALL_DEVICES" 编译所有设备)
-        type: choice
-        default: ALL_DEVICES
-        options:
-          - ALL_DEVICES
-          - ipq60xx_immwrt_Pro
-          - ipq60xx_immwrt_Max
-          - ipq60xx_immwrt_Ultra
-          - ipq60xx_libwrt_Pro
-          - ipq60xx_libwrt_Max
-          - ipq60xx_libwrt_Ultra
-          - ipq60xx_openwrt_Pro
-          - ipq60xx_openwrt_Max
-          - ipq60xx_openwrt_Ultra
-  schedule:
-    # 每周五 00:00 北京时间 (UTC+8)
-    - cron: '0 16 * * 4'
-env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-jobs:
-  build_all:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Free disk space
-        uses: sbwml/actions@free-disk
-      - name: Build System Setup
-        run: |
-          sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
-          sudo -E apt -yqq install dos2unix
-          sudo -E apt -yqq install libfuse-dev
-          sudo -E apt -yqq autoremove --purge
-          sudo -E apt -yqq autoclean
-          sudo -E apt -yqq clean
-          sudo -E systemctl daemon-reload
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Set Build Date and Timezone
-        run: |
-          sudo -E timedatectl set-timezone "Asia/Shanghai"
-          export BUILD_DATE=$(TZ=UTC-8 date +"%y.%m.%d_%H.%M.%S")
-          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
-          # 判断是否是全部设备编译
-          if [[ "${{ inputs.model }}" == "ALL_DEVICES" ]] || [[ "${{ inputs.model }}" == "" ]]; then
-            export BUILD_MODE="ALL"
-          else
-            export BUILD_MODE="SELECTED"
-          fi
-          echo "BUILD_MODE=$BUILD_MODE" >> $GITHUB_ENV
-      - name: Set Execute Permissions
-        run: |
-          echo "=== 设置执行权限 ==="
-          # 为 scripts 目录下的所有 .sh 文件设置执行权限
-          find ./scripts -name "*.sh" -type f -exec chmod +x {} \;
-          echo "执行权限设置完成"
-      - name: Define Models to Build
-        run: |
-          if [[ "${{ inputs.model }}" == "ALL_DEVICES" ]] || [[ "${{ inputs.model }}" == "" ]]; then
-            MODELS=("ipq60xx_immwrt_Pro" "ipq60xx_immwrt_Max" "ipq60xx_immwrt_Ultra" "ipq60xx_libwrt_Pro" "ipq60xx_libwrt_Max" "ipq60xx_libwrt_Ultra" "ipq60xx_openwrt_Pro" "ipq60xx_openwrt_Max" "ipq60xx_openwrt_Ultra")
-          else
-            MODELS=("${{ inputs.model }}")
-          fi
-          echo "MODELS=${MODELS[*]}" >> $GITHUB_ENV
-          echo "BUILD_COUNT=${#MODELS[@]}" >> $GITHUB_ENV
-      - name: Build All Devices Sequentially
-        run: |
-          echo "开始构建 ${BUILD_COUNT} 个设备..."
-          for model in "${MODELS[@]}"; do
-            echo "正在构建设备: $model"
-            ./scripts/pre_clone_action_QW.sh "$model"
-            ./scripts/build_QW.sh "$model"
-            echo "设备 $model 构建完成"
-          done
-          echo "所有设备构建完成"
-      - name: Create Combined Firmware Directory
-        run: |
-          echo "创建合并固件目录..."
-          mkdir -p ./final_release
-          
-          # 复制所有设备的固件
-          echo "复制固件文件..."
-          find ./firmware -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*.config" -o -name "*.buildinfo" \) -exec cp {} ./final_release/ \;
-          
-          # 复制 changelog 文件
-          if [ -d "./firmware" ]; then
-            find ./firmware -name "changelog_*.md" -exec cp {} ./final_release/ \;
-          fi
-          
-          echo "固件文件已复制到 ./final_release"
-      - name: Generate Combined Changelog
-        run: |
-          echo "生成合并的 changelog..."
-          echo "# Combined Build Changelog" > ./final_release/changelog.md
-          echo "## Build Date: $BUILD_DATE" >> ./final_release/changelog.md
-          echo "" >> ./final_release/changelog.md
-          echo "### Build Configuration:" >> ./final_release/changelog.md
-          echo "- Build Mode: $BUILD_MODE" >> ./final_release/changelog.md
-          echo "- Devices Count: $BUILD_COUNT" >> ./final_release/changelog.md
-          echo "" >> ./final_release/changelog.md
-          
-          echo "### Built Devices:" >> ./final_release/changelog.md
-          for model in "${MODELS[@]}"; do
-            echo "- $model" >> ./final_release/changelog.md
-          done
-          echo "" >> ./final_release/changelog.md
-          
-          echo "### Built Firmware Files:" >> ./final_release/changelog.md
-          ls -la ./final_release | grep -E '\.(bin|manifest|config|buildinfo)$' | awk '{print "- `" $9 "`"}' >> ./final_release/changelog.md
-          echo "" >> ./final_release/changelog.md
-          
-          echo "### Built Packages Summary:" >> ./final_release/changelog.md
-          # 从所有 manifest 文件中提取包信息
-          if [ -d "./final_release" ] && [ $(find ./final_release -name "*.manifest" | wc -l) -gt 0 ]; then
-            echo "From individual manifests:" >> ./final_release/changelog.md
-            find ./final_release -name "*.manifest" -exec grep -oP "luci-app(-[a-zA-Z0-9]{1,}){1,}" {} \; | sort -u | awk '{print "- `" $0 "`"}' >> ./final_release/changelog.md
-          fi
-          echo "" >> ./final_release/changelog.md
-          
-          echo "### Kernel Version:" >> ./final_release/changelog.md
-          KVER=$(find ./action_build/dl -maxdepth 1 -name "linux-[4-6]\.*" | sort -r | head -n 1 | grep -oE "[4-6]\.[0-9]{1,3}\.[0-9]{1,3}")
-          echo "- $KVER" >> ./final_release/changelog.md
-          echo "" >> ./final_release/changelog.md
-          
-          echo "### Build Environment:" >> ./final_release/changelog.md
-          echo "- Build Date: $BUILD_DATE" >> ./final_release/changelog.md
-          echo "- OS: Ubuntu 24.04" >> ./final_release/changelog.md
-          echo "- Architecture: x86_64" >> ./final_release/changelog.md
-          echo "" >> ./final_release/changelog.md
-          
-          echo "Changelog generated successfully"
-      - name: Prepare Release Body
-        run: |
-          echo "云编译发布" > release_body.txt
-          echo "源码：https://github.com/your-repo" >> release_body.txt
-          echo "Kernel: $(find ./action_build/dl -maxdepth 1 -name "linux-[4-6]\.*" | sort -r | head -n 1 | grep -oE "[4-6]\.[0-9]{1,3}\.[0-9]{1,3}")" >> release_body.txt
-          echo "WIFI密码: 12345678" >> release_body.txt
-          echo "LAN地址: 192.168.111.1" >> release_body.txt
-          echo "插件：" >> release_body.txt
-          # 从所有 manifest 中提取插件信息
-          find ./final_release -name "*.manifest" | while read -r manifest; do
-            if [ -f "$manifest" ]; then
-              grep -oP "luci-app(-[a-zA-Z0-9]{1,}){1,}" "$manifest" | sort -u
+#!/usr/bin/env bash
+set -e
+#BASE_PATH=$(cd $(dirname $0) && pwd)
+BASE_PATH="$(dirname "$(dirname "$(readlink -f "$0")")")"
+Dev=$1
+Build_Mod=$2
+CONFIG_FILE="$BASE_PATH/deconfig/$Dev.config"
+INI_FILE="$BASE_PATH/compilecfg/$Dev.ini"
+
+# --- 新增：日志函数 ---
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [INFO] $*"
+}
+warn() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [WARN] $*" >&2
+}
+error() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] [ERROR] $*" >&2
+    exit 1
+}
+
+log "Starting build for model: $Dev"
+
+if [[ ! -f $CONFIG_FILE ]]; then
+    error "Config not found: $CONFIG_FILE"
+fi
+if [[ ! -f $INI_FILE ]]; then
+    error "INI file not found: $INI_FILE"
+fi
+
+# --- 保留原有的 read_ini_by_key 函数 ---
+read_ini_by_key() {
+    local key=$1
+    awk -F"=" -v key="$key" '$1 == key {print $2}' "$INI_FILE"
+}
+
+# --- 保留原有的 remove_uhttpd_dependency 和 apply_config 函数 ---
+remove_uhttpd_dependency() {
+    local config_path="$BASE_PATH/$BUILD_DIR/.config"
+    local luci_makefile_path="$BASE_PATH/$BUILD_DIR/feeds/luci/collections/luci/Makefile"
+    if grep -q "CONFIG_PACKAGE_luci-app-quickfile=y" "$config_path"; then
+        if [ -f "$luci_makefile_path" ]; then
+            sed -i '/luci-light/d' "$luci_makefile_path"
+            log "Removed uhttpd (luci-light) dependency as luci-app-quickfile (nginx) is enabled."
+        fi
+    fi
+}
+apply_config() {
+    # 复制基础配置文件
+    \cp -f "$CONFIG_FILE" "$BASE_PATH/$BUILD_DIR/.config"
+    # --- 暂时屏蔽 ---
+    # if grep -qE "(ipq60xx|ipq807x)" "$BASE_PATH/$BUILD_DIR/.config"; then
+    #     cat "$BASE_PATH/deconfig/nss.config" >> "$BASE_PATH/$BUILD_DIR/.config"
+    # fi
+    # cat "$BASE_PATH/deconfig/proxy.config" >> "$BASE_PATH/$BUILD_DIR/.config"
+    log "Applied config file: $CONFIG_FILE"
+}
+
+# --- 获取变量 ---
+REPO_URL=$(read_ini_by_key "REPO_URL")
+REPO_BRANCH=$(read_ini_by_key "REPO_BRANCH")
+REPO_BRANCH=${REPO_BRANCH:-main}
+BUILD_DIR=$(read_ini_by_key "BUILD_DIR")
+COMMIT_HASH=$(read_ini_by_key "COMMIT_HASH")
+COMMIT_HASH=${COMMIT_HASH:-none}
+
+if [[ -d $BASE_PATH/action_build ]]; then
+    BUILD_DIR="action_build"
+fi
+
+# --- 调用 update.sh ---
+log "Calling update.sh..."
+$BASE_PATH/scripts/update.sh "$REPO_URL" "$REPO_BRANCH" "$BASE_PATH/$BUILD_DIR" "$COMMIT_HASH"
+
+# --- 应用配置 ---
+log "Applying configuration..."
+apply_config
+remove_uhttpd_dependency
+
+# --- 切换目录并执行构建 ---
+cd "$BASE_PATH/$BUILD_DIR"
+log "Running make defconfig..."
+make defconfig
+
+# --- 特殊处理 x86_64 ---
+if grep -qE "^CONFIG_TARGET_x86_64=y" "$CONFIG_FILE"; then
+    DISTFEEDS_PATH="$BASE_PATH/$BUILD_DIR/package/emortal/default-settings/files/99-distfeeds.conf"
+    if [ -d "${DISTFEEDS_PATH%/*}" ] && [ -f "$DISTFEEDS_PATH" ]; then
+        sed -i 's/aarch64_cortex-a53/x86_64/g' "$DISTFEEDS_PATH"
+        log "Updated distfeeds.conf for x86_64."
+    fi
+fi
+
+# --- Debug 模式 ---
+if [[ $Build_Mod == "debug" ]]; then
+    log "Debug mode enabled. Exiting."
+    exit 0
+fi
+
+# --- 清理旧的构建产物 ---
+TARGET_DIR="$BASE_PATH/$BUILD_DIR/bin/targets"
+if [[ -d $TARGET_DIR ]]; then
+    log "Cleaning old binaries in $TARGET_DIR..."
+    find "$TARGET_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" \) -exec rm -f {} +
+fi
+
+# --- 下载依赖 ---
+log "Downloading dependencies..."
+make download -j$(($(nproc) * 2))
+
+# --- 开始编译 ---
+log "Starting compilation..."
+make -j$(($(nproc) + 1)) || make -j1 V=s
+
+# --- 创建固件输出目录 ---
+FIRMWARE_DIR="$BASE_PATH/firmware/$Dev"
+log "Creating firmware output directory: $FIRMWARE_DIR"
+\rm -rf "$FIRMWARE_DIR"
+mkdir -p "$FIRMWARE_DIR"
+
+# --- 复制原始文件到固件目录 ---
+log "Copying raw build artifacts to $FIRMWARE_DIR..."
+find "$TARGET_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" \) -exec cp -f {} "$FIRMWARE_DIR/" \;
+
+# --- 删除可能残留的 Packages.manifest ---
+\rm -f "$FIRMWARE_DIR/Packages.manifest" 2>/dev/null
+
+# --- 新增：生成 Changelog ---
+log "Generating changelog..."
+{
+    echo "# Build Changelog for $Dev"
+    echo "## Build Date: $(date '+%Y-%m-%d %H:%M:%S')"
+    echo ""
+    echo "### Build Details:"
+    echo "- Model: $Dev"
+    echo "- Source: $REPO_URL"
+    echo "- Branch: $REPO_BRANCH"
+    echo "- Commit Hash: $COMMIT_HASH"
+    echo "- Kernel Version: $(find ./action_build/dl -maxdepth 1 -name "linux-[4-6]\.*" | sort -r | head -n 1 | grep -oE "[4-6]\.[0-9]{1,3}\.[0-9]{1,3}")"
+    echo ""
+    echo "### Built Firmware Files:"
+    ls -la "$FIRMWARE_DIR" | grep -E '\.(bin|manifest|config|buildinfo)$' | awk '{print "- `" $9 "`"}'
+    echo ""
+    echo "### Built Packages (from manifest):"
+    if [ -f "$FIRMWARE_DIR/$Dev.manifest" ]; then
+        grep -oP "luci-app(-[a-zA-Z0-9]{1,}){1,}" "$FIRMWARE_DIR/$Dev.manifest" | sort -u | awk '{print "- `" $0 "`"}'
+    else
+        echo "No manifest found."
+    fi
+} > "$FIRMWARE_DIR/changelog_$Dev.md"
+
+# --- 新增：重命名固件并复制配置文件 ---
+log "Renaming firmware and copying config files..."
+
+# --- 解析模型名以获取前缀 ---
+# 示例: ipq60xx_immwrt_Pro -> prefix=immwrt-re, suffix=Pro
+PREFIX=""
+SUFFIX=""
+MODEL_TYPE="" # immwrt or libwrt or openwrt
+case "$Dev" in
+    *immwrt_Pro) PREFIX="immwrt-re"; SUFFIX="Pro" ;;
+    *immwrt_Max) PREFIX="immwrt-re"; SUFFIX="Max" ;;
+    *immwrt_Ultra) PREFIX="immwrt-re"; SUFFIX="Ultra" ;;
+    *libwrt_Pro) PREFIX="libwrt-re"; SUFFIX="Pro" ;;
+    *libwrt_Max) PREFIX="libwrt-re"; SUFFIX="Max" ;;
+    *libwrt_Ultra) PREFIX="libwrt-re"; SUFFIX="Ultra" ;;
+    *openwrt_Pro) PREFIX="openwrt-re"; SUFFIX="Pro" ;;
+    *openwrt_Max) PREFIX="openwrt-re"; SUFFIX="Max" ;;
+    *openwrt_Ultra) PREFIX="openwrt-re"; SUFFIX="Ultra" ;;
+    *) PREFIX="$Dev" ; SUFFIX="Unknown" ;;
+esac
+
+# --- 处理固件文件 ---
+for file in "$FIRMWARE_DIR"/*.bin; do
+    if [ -f "$file" ]; then
+        original_name=$(basename "$file")
+        log "Processing firmware file: $original_name"
+        
+        # 检查文件名是否包含 _re- 或 -re- (确保结构匹配)
+        if [[ "$original_name" == *_re-* ]] || [[ "$original_name" == *-re-* ]]; then
+            # 提取设备型号部分 (如 cs-02 或 ss-01)
+            # 使用更精确的正则表达式匹配设备型号
+            if [[ "$original_name" =~ (_re-|-re-)([a-zA-Z]+-[0-9]+) ]]; then
+                part="${BASH_REMATCH[2]}"
+                log "Extracted device model part: $part"
+                
+                # 判断是 factory 还是 sysupgrade
+                if [[ "$original_name" == *"factory"* ]]; then
+                    new_name="${PREFIX}-${part}-factory-${SUFFIX}.bin"
+                    log "Renaming firmware: $original_name -> $new_name"
+                    mv "$file" "$FIRMWARE_DIR/$new_name"
+                elif [[ "$original_name" == *"sysupgrade"* ]]; then
+                    new_name="${PREFIX}-${part}-sysupgrade-${SUFFIX}.bin"
+                    log "Renaming firmware: $original_name -> $new_name"
+                    mv "$file" "$FIRMWARE_DIR/$new_name"
+                else
+                    log "File $original_name doesn't contain 'factory' or 'sysupgrade', skipping rename."
+                fi
+            else
+                warn "Could not extract device model from $original_name. Keeping original."
             fi
-          done | sort -u >> release_body.txt
-      - name: Release Combined Firmware
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ env.BUILD_DATE }}_combined
-          files: ./final_release/*.*
-          body_path: ./release_body.txt
-      - name: Cleanup
-        run: |
-          echo "清理临时文件..."
-          rm -rf ./action_build/.ccache
-          rm -rf ./action_build/staging_dir
-          echo "清理完成"
+        else
+            log "Filename $original_name does not match expected pattern (_re- or -re-). Skipping rename."
+        fi
+    fi
+done
+
+# --- 复制配置文件 ---
+# 检查是否有 .config 文件
+if [ -f "$BASE_PATH/$BUILD_DIR/.config" ]; then
+    log "Copying .config file as ${PREFIX}.${SUFFIX}.config"
+    cp "$BASE_PATH/$BUILD_DIR/.config" "$FIRMWARE_DIR/${PREFIX}.${SUFFIX}.config"
+fi
+
+# 检查是否有 .buildinfo 文件
+if [ -f "$BASE_PATH/$BUILD_DIR/.buildinfo" ]; then
+    log "Copying .buildinfo file as ${PREFIX}.${SUFFIX}.buildinfo"
+    cp "$BASE_PATH/$BUILD_DIR/.buildinfo" "$FIRMWARE_DIR/${PREFIX}.${SUFFIX}.buildinfo"
+fi
+
+# 检查是否有 manifest 文件
+if [ -f "$FIRMWARE_DIR/$Dev.manifest" ]; then
+    log "Copying manifest file as ${PREFIX}.${SUFFIX}.manifest"
+    cp "$FIRMWARE_DIR/$Dev.manifest" "$FIRMWARE_DIR/${PREFIX}.${SUFFIX}.manifest"
+fi
+
+# 检查是否有 Packages.manifest 文件
+if [ -f "$FIRMWARE_DIR/Packages.manifest" ]; then
+    log "Copying Packages.manifest file as ${PREFIX}.${SUFFIX}.Packages.manifest"
+    cp "$FIRMWARE_DIR/Packages.manifest" "$FIRMWARE_DIR/${PREFIX}.${SUFFIX}.Packages.manifest"
+fi
+
+# --- 清理临时文件 ---
+if [[ -d $BASE_PATH/action_build ]]; then
+    log "Cleaning up action_build..."
+    make clean
+fi
+
+log "Build and rename process completed for model: $Dev"
