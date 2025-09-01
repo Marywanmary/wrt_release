@@ -1,13 +1,7 @@
 #!/usr/bin/env bash
 set -e
 #BASE_PATH=$(cd $(dirname $0) && pwd)
-# 获取脚本所在目录的父目录（项目根目录）
-#BASE_PATH=$(dirname "$(readlink -f "$0")")
-# readlink -f "$0" ：解析脚本的真实绝对路径（无论符号链接或相对路径）。 
-# dirname ：直接获取脚本所在目录的父目录（即项目根目录）。
-# 获取项目根目录
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BASE_PATH="$(dirname "$SCRIPT_DIR")"
+BASE_PATH="$(dirname "$(dirname "$(readlink -f "$0")")")"
 Dev=$1
 Build_Mod=$2
 CONFIG_FILE="$BASE_PATH/deconfig/$Dev.config"
