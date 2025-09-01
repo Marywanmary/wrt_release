@@ -1,0 +1,159 @@
+name: Release-IPQ-Auto-Combine-QW
+run-name: Release - ${{ inputs.model || 'All Devices' }}
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        required: false
+        description: Device Model (选择 "ALL_DEVICES" 编译所有设备)
+        type: choice
+        default: ALL_DEVICES
+        options:
+          - ALL_DEVICES
+          - ipq60xx_immwrt_Pro
+          - ipq60xx_immwrt_Max
+          - ipq60xx_immwrt_Ultra
+          - ipq60xx_libwrt_Pro
+          - ipq60xx_libwrt_Max
+          - ipq60xx_libwrt_Ultra
+  schedule:
+    # 每周五 00:00 北京时间 (UTC+8)
+    - cron: '0 16 * * 4'
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+jobs:
+  build_all:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Free disk space
+        uses: sbwml/actions@free-disk
+      - name: Build System Setup
+        run: |
+          sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
+          sudo -E apt -yqq install dos2unix
+          sudo -E apt -yqq install libfuse-dev
+          sudo -E apt -yqq autoremove --purge
+          sudo -E apt -yqq autoclean
+          sudo -E apt -yqq clean
+          sudo -E systemctl daemon-reload
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set Build Date and Timezone
+        run: |
+          sudo -E timedatectl set-timezone "Asia/Shanghai"
+          export BUILD_DATE=$(TZ=UTC-8 date +"%y.%m.%d_%H.%M.%S")
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
+          # 判断是否是全部设备编译
+          if [[ "${{ inputs.model }}" == "ALL_DEVICES" ]] || [[ "${{ inputs.model }}" == "" ]]; then
+            export BUILD_MODE="ALL"
+          else
+            export BUILD_MODE="SELECTED"
+          fi
+          echo "BUILD_MODE=$BUILD_MODE" >> $GITHUB_ENV
+      - name: Set Execute Permissions
+        run: |
+          echo "=== 设置执行权限 ==="
+          # 为 scripts 目录下的所有 .sh 文件设置执行权限
+          find ./scripts -name "*.sh" -type f -exec chmod +x {} \;
+          echo "执行权限设置完成"
+      - name: Define Models to Build
+        run: |
+          if [[ "${{ inputs.model }}" == "ALL_DEVICES" ]] || [[ "${{ inputs.model }}" == "" ]]; then
+            MODELS=("ipq60xx_immwrt_Pro" "ipq60xx_immwrt_Max" "ipq60xx_immwrt_Ultra" "ipq60xx_libwrt_Pro" "ipq60xx_libwrt_Max" "ipq60xx_libwrt_Ultra")
+          else
+            MODELS=("${{ inputs.model }}")
+          fi
+          echo "MODELS=${MODELS[*]}" >> $GITHUB_ENV
+          echo "BUILD_COUNT=${#MODELS[@]}" >> $GITHUB_ENV
+      - name: Build All Devices Sequentially
+        run: |
+          echo "开始构建 ${BUILD_COUNT} 个设备..."
+          for model in "${MODELS[@]}"; do
+            echo "正在构建设备: $model"
+            ./scripts/pre_clone_action_QW.sh "$model"
+            ./scripts/build_QW.sh "$model"
+            echo "设备 $model 构建完成"
+          done
+          echo "所有设备构建完成"
+      - name: Create Combined Firmware Directory
+        run: |
+          echo "创建合并固件目录..."
+          mkdir -p ./final_release
+          
+          # 复制所有设备的固件
+          echo "复制固件文件..."
+          find ./action_build/bin/targets -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*.config" -o -name "*.buildinfo" \) -exec cp {} ./final_release/ \;
+          
+          # 复制 changelog 文件
+          if [ -f "./action_build/firmware/changelog_*.md" ]; then
+            find ./action_build/firmware -name "changelog_*.md" -exec cp {} ./final_release/ \;
+          fi
+          
+          echo "固件文件已复制到 ./final_release"
+      - name: Generate Combined Changelog
+        run: |
+          echo "生成合并的 changelog..."
+          echo "# Combined Build Changelog" > ./final_release/changelog.md
+          echo "## Build Date: $BUILD_DATE" >> ./final_release/changelog.md
+          echo "" >> ./final_release/changelog.md
+          echo "### Build Configuration:" >> ./final_release/changelog.md
+          echo "- Build Mode: $BUILD_MODE" >> ./final_release/changelog.md
+          echo "- Devices Count: $BUILD_COUNT" >> ./final_release/changelog.md
+          echo "" >> ./final_release/changelog.md
+          
+          echo "### Built Devices:" >> ./final_release/changelog.md
+          for model in "${MODELS[@]}"; do
+            echo "- $model" >> ./final_release/changelog.md
+          done
+          echo "" >> ./final_release/changelog.md
+          
+          echo "### Built Firmware Files:" >> ./final_release/changelog.md
+          ls -la ./final_release | grep -E '\.(bin|manifest|config|buildinfo)$' | awk '{print "- `" $9 "`"}' >> ./final_release/changelog.md
+          echo "" >> ./final_release/changelog.md
+          
+          echo "### Built Packages Summary:" >> ./final_release/changelog.md
+          # 从 manifest 文件中提取包信息
+          if [ -f "./final_release/changelog_*.md" ]; then
+            echo "From individual changelogs:" >> ./final_release/changelog.md
+            grep -A 20 "Built Packages" ./final_release/changelog_*.md | grep "^- " >> ./final_release/changelog.md
+          fi
+          echo "" >> ./final_release/changelog.md
+          
+          echo "### Kernel Version:" >> ./final_release/changelog.md
+          KVER=$(find ./action_build/dl -maxdepth 1 -name "linux-[4-6]\.*" | sort -r | head -n 1 | grep -oE "[4-6]\.[0-9]{1,3}\.[0-9]{1,3}")
+          echo "- $KVER" >> ./final_release/changelog.md
+          echo "" >> ./final_release/changelog.md
+          
+          echo "### Build Environment:" >> ./final_release/changelog.md
+          echo "- Build Date: $BUILD_DATE" >> ./final_release/changelog.md
+          echo "- OS: Ubuntu 24.04" >> ./final_release/changelog.md
+          echo "- Architecture: x86_64" >> ./final_release/changelog.md
+          echo "" >> ./final_release/changelog.md
+          
+          echo "Changelog generated successfully"
+      - name: Prepare Release Body
+        run: |
+          echo "云编译发布" > release_body.txt
+          echo "源码：https://github.com/your-repo" >> release_body.txt
+          echo "Kernel: $(find ./action_build/dl -maxdepth 1 -name "linux-[4-6]\.*" | sort -r | head -n 1 | grep -oE "[4-6]\.[0-9]{1,3}\.[0-9]{1,3}")" >> release_body.txt
+          echo "WIFI密码: 12345678" >> release_body.txt
+          echo "LAN地址: 192.168.111.1" >> release_body.txt
+          echo "插件：" >> release_body.txt
+          # 从所有 manifest 中提取插件信息
+          find ./final_release -name "*.manifest" | while read -r manifest; do
+            if [ -f "$manifest" ]; then
+              grep -oP "luci-app(-[a-zA-Z0-9]{1,}){1,}" "$manifest" | sort -u
+            fi
+          done | sort -u >> release_body.txt
+      - name: Release Combined Firmware
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.BUILD_DATE }}_combined
+          files: ./final_release/*.*
+          body_path: ./release_body.txt
+      - name: Cleanup
+        run: |
+          echo "清理临时文件..."
+          rm -rf ./action_build/.ccache
+          rm -rf ./action_build/staging_dir
+          echo "清理完成"
