@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -e
 #BASE_PATH=$(cd $(dirname $0)/.. && pwd)
-BASE_PATH=$(dirname "$(readlink -f "$0")")
+# 获取项目根目录
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+BASE_PATH="$(dirname "$SCRIPT_DIR")"
 Dev=$1
 Build_Mod=$2
 CONFIG_FILE="$BASE_PATH/deconfig/$Dev.config"
