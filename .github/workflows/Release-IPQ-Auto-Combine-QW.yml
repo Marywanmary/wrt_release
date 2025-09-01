@@ -54,12 +54,6 @@ jobs:
             export BUILD_MODE="SELECTED"
           fi
           echo "BUILD_MODE=$BUILD_MODE" >> $GITHUB_ENV
-      - name: Set Execute Permissions
-        run: |
-          echo "=== 设置执行权限 ==="
-          # 为 scripts 目录下的所有 .sh 文件设置执行权限
-          find ./scripts -name "*.sh" -type f -exec chmod +x {} \;
-          echo "执行权限设置完成"
       - name: Define Models to Build
         run: |
           if [[ "${{ inputs.model }}" == "ALL_DEVICES" ]] || [[ "${{ inputs.model }}" == "" ]]; then
@@ -69,7 +63,8 @@ jobs:
           fi
           
           # 将数组转换为JSON格式，以便在后续步骤中正确解析
-          echo "MODELS_JSON=$(printf '%s\n' "${MODELS[@]}" | jq -R . | jq -s .)" >> $GITHUB_ENV
+          MODELS_JSON=$(printf '%s\n' "${MODELS[@]}" | jq -R . | jq -s .)
+          echo "MODELS_JSON=$MODELS_JSON" >> $GITHUB_ENV
           echo "BUILD_COUNT=${#MODELS[@]}" >> $GITHUB_ENV
       - name: Build All Devices Sequentially
         run: |
