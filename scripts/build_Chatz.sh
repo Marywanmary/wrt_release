@@ -2,7 +2,7 @@
 
 set -e
 
-BASE_PATH=$(cd $(dirname $0)/.. && pwd)
+BASE_PATH="$(dirname "$(dirname "$(readlink -f "$0")")")"
 
 Dev=$1
 Build_Mod=$2
