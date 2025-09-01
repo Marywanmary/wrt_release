@@ -13,10 +13,7 @@ error_handler() {
 trap 'error_handler' ERR
 
 #BASE_PATH=$(cd $(dirname $0)../ && pwd)
-#BASE_PATH=$(dirname "$(readlink -f "$0")")
-# 获取项目根目录
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-BASE_PATH="$(dirname "$SCRIPT_DIR")"
+BASE_PATH="$(dirname "$(dirname "$(readlink -f "$0")")")"
 
 REPO_URL=$1
 REPO_BRANCH=$2
