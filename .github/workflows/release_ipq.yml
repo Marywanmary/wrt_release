@@ -57,6 +57,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set Execute Permissions
+        run: |
+          echo "=== 设置执行权限 ==="
+          find . -name "*.sh" -type f -exec sh -c 'head -n1 "$1" | grep -q "^#!/" && chmod +x "$1"' _ {} \;
+
       - name: Set Build Date and Timezone
         run: |
           sudo -E timedatectl set-timezone "Asia/Shanghai"
