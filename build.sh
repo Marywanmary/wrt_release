@@ -100,7 +100,7 @@ apply_config() {
         # 如果是这些平台，就把NSS配置追加到主配置文件
         # cat 显示文件内容，>> 表示追加到文件末尾
         # NSS是网络加速引擎，需要额外配置
-    fi
+    # fi
     # 追加代理配置
     # cat "$BASE_PATH/deconfig/proxy.config" >> "$BASE_PATH/$BUILD_DIR/.config"
     # 将代理配置追加到主配置文件
