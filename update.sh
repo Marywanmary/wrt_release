@@ -137,6 +137,12 @@ update_feeds() {
         [ -z "$(tail -c 1 "$BUILD_DIR/$FEEDS_CONF")" ] || echo "" >>"$BUILD_DIR/$FEEDS_CONF"
         # 添加新的软件源
         echo "src-git small8 https://github.com/kenzok8/small-package" >>"$BUILD_DIR/$FEEDS_CONF"
+
+        # 添加其它的软件源
+        echo "git clone --depth=1 tailscale https://github.com/tailscale/tailscale" >>"$BUILD_DIR/$FEEDS_CONF"
+        echo "git clone --depth=1 taskplan https://github.com/sirpdboy/luci-app-taskplan" >>"$BUILD_DIR/$FEEDS_CONF"
+        echo "git clone --depth=1 lucky https://github.com/gdy666/luci-app-lucky" >>"$BUILD_DIR/$FEEDS_CONF"
+        #echo "src-git small8 https://github.com/kenzok8/small-package" >>"$BUILD_DIR/$FEEDS_CONF"
     fi
     
     # 添加bpf.mk文件解决更新报错
@@ -624,15 +630,15 @@ boot() {
     sed -i '/wireguard_watchdog/d' /etc/crontabs/root
     
     # 获取 WireGuard 接口名称
-    local wg_ifname=$(wg show | awk '/interface/ {print $2}')
+    # local wg_ifname=$(wg show | awk '/interface/ {print $2}')
     
-    if [ -n "$wg_ifname" ]; then
-        # 如果有WireGuard接口，添加看门狗任务
-        echo "*/15 * * * * /usr/bin/wireguard_watchdog" >>/etc/crontabs/root
-        # 每15分钟检查一次WireGuard连接状态
-        uci set system.@system[0].cronloglevel='9'
-        uci commit system
-        /etc/init.d/cron restart
+    # if [ -n "$wg_ifname" ]; then
+    #     # 如果有WireGuard接口，添加看门狗任务
+    #     echo "*/15 * * * * /usr/bin/wireguard_watchdog" >>/etc/crontabs/root
+    #     # 每15分钟检查一次WireGuard连接状态
+    #     uci set system.@system[0].cronloglevel='9'
+    #     uci commit system
+    #     /etc/init.d/cron restart
     fi
     
     # 应用新的 crontab 配置
