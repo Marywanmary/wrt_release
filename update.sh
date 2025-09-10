@@ -137,23 +137,6 @@ update_feeds() {
         [ -z "$(tail -c 1 "$BUILD_DIR/$FEEDS_CONF")" ] || echo "" >>"$BUILD_DIR/$FEEDS_CONF"
         # 添加新的软件源
         echo "src-git small8 https://github.com/kenzok8/small-package" >>"$BUILD_DIR/$FEEDS_CONF"
-
-        # 添加其它的软件源
-
-update_feeds() {
-    # 删除配置文件中的注释行
-    sed -i '/^#/d' "$BUILD_DIR/$FEEDS_CONF"
-    # sed是文本编辑工具
-    # -i 表示直接修改文件
-    # '/^#/d' 表示删除所有以#开头的行（注释行）
-    
-    # 检查并添加 small-package 源
-    if ! grep -q "small-package" "$BUILD_DIR/$FEEDS_CONF"; then
-        # 如果配置文件中没有small-package源
-        # 确保文件以换行符结尾
-        [ -z "$(tail -c 1 "$BUILD_DIR/$FEEDS_CONF")" ] || echo "" >>"$BUILD_DIR/$FEEDS_CONF"
-        # 添加新的软件源
-        echo "src-git small8 https://github.com/kenzok8/small-package" >>"$BUILD_DIR/$FEEDS_CONF"
         
         # 添加其它的软件源（使用正确的feeds格式）
         echo "src-git tailscale https://github.com/tailscale/tailscale" >>"$BUILD_DIR/$FEEDS_CONF"
