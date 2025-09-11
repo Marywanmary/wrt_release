@@ -217,15 +217,18 @@ mkdir -p "$FIRMWARE_DIR"
 # mkdir 是创建目录的命令
 # -p 表示如果父目录不存在也一并创建
 
-# 复制所有编译产物文件
-find "$TARGET_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" \) -exec cp -f {} "$FIRMWARE_DIR/" \;
+# 复制所有编译产物文件（包括固件和manifest）从TARGET_DIR
+find "$TARGET_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" -o -name ".config" -o -name "config.buildinfo" -o -name "Packages.manifest" \) -exec cp -f {} "$FIRMWARE_DIR/" \;
+
+# 复制所有编译产物文件（包括固件和manifest）从BUILD_DIR
+find "$BASE_PATH/$BUILD_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" -o -name ".config" -o -name "config.buildinfo" -o -name "Packages.manifest" \) -exec cp -f {} "$FIRMWARE_DIR/" \;
 
 \rm -f "$BASE_PATH/firmware/Packages.manifest" 2>/dev/null
 # 删除固件目录中的Packages.manifest文件（如果存在）
 # 2>/dev/null 表示将错误信息丢弃，不显示
 # 这个文件可能是包管理器的清单文件，不需要包含在最终固件中
 
-# === 新增部分：固件重命名和配置文件复制 ===
+# === 新增部分：固件重命名和配置文件重命名 ===
 # 解析设备名称，检查是否符合三段式结构
 if [[ $Dev =~ ^([^_]+)_([^_]+)_([^_]+)$ ]]; then
     CHIP="${BASH_REMATCH[1]}"      # 芯片部分 (如 ipq60xx)
@@ -253,7 +256,7 @@ if [[ $Dev =~ ^([^_]+)_([^_]+)_([^_]+)$ ]]; then
         fi
     done
     
-    # 处理manifest文件
+    # 重命名manifest文件
     for manifest_file in "$FIRMWARE_DIR"/*.manifest; do
         if [[ -f "$manifest_file" ]]; then
             # 获取文件名（不含路径）
@@ -266,34 +269,24 @@ if [[ $Dev =~ ^([^_]+)_([^_]+)_([^_]+)$ ]]; then
         fi
     done
     
-    # 复制并重命名配置文件
-    config_files=(".config" ".config.buildinfo" "Packages.manifest")
+    # 重命名配置文件
+    config_files=(".config" "config.buildinfo" "Packages.manifest")
     for file in "${config_files[@]}"; do
-        # 尝试在多个位置查找文件
-        src_file=""
-        if [[ -f "$BASE_PATH/$BUILD_DIR/$file" ]]; then
-            src_file="$BASE_PATH/$BUILD_DIR/$file"
-        elif [[ -f "$TARGET_DIR/$file" ]]; then
-            src_file="$TARGET_DIR/$file"
-        elif [[ $file == "Packages.manifest" && -f "$BASE_PATH/$BUILD_DIR/staging_dir/host/pkginfo/Packages.manifest" ]]; then
-            src_file="$BASE_PATH/$BUILD_DIR/staging_dir/host/pkginfo/Packages.manifest"
-        fi
-        
-        if [[ -n "$src_file" ]]; then
+        if [[ -f "$FIRMWARE_DIR/$file" ]]; then
             # 构建新文件名
             new_file="${CHIP}-${BRANCH_ABBR}-${CONFIG}${file}"
             
-            # 复制文件
-            cp "$src_file" "$FIRMWARE_DIR/$new_file"
-            echo "Copied $file from $src_file to $FIRMWARE_DIR/$new_file"
+            # 重命名文件
+            mv "$FIRMWARE_DIR/$file" "$FIRMWARE_DIR/$new_file"
+            echo "Renamed $file to $new_file"
         else
-            echo "Warning: Config file not found: $file"
+            echo "Warning: Config file not found in firmware directory: $file"
         fi
     done
 else
     echo "Device name '$Dev' does not follow the three-part structure, skipping renaming."
 fi
-# === 新增部分结束 ===
+# === 重命名部分结束 ===
 
 if [[ -d $BASE_PATH/action_build ]]; then
     # 检查是否存在action_build目录
