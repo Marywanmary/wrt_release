@@ -1,5 +1,5 @@
 name: Release IPQ CZ Batch
-run-name: Release - ${{ matrix.model }}
+
 on:
   workflow_dispatch:
   schedule:
