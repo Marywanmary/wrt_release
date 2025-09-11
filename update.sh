@@ -142,6 +142,7 @@ update_feeds() {
         echo "src-git tailscale https://github.com/tailscale/tailscale" >>"$BUILD_DIR/$FEEDS_CONF"
         echo "src-git taskplan https://github.com/sirpdboy/luci-app-taskplan" >>"$BUILD_DIR/$FEEDS_CONF"
         echo "src-git lucky https://github.com/gdy666/luci-app-lucky" >>"$BUILD_DIR/$FEEDS_CONF"
+        echo "src-git momo https://github.com/nikkinikki-org/OpenWrt-momo.git;main" >>"$BUILD_DIR/$FEEDS_CONF"
     fi
     
     # 添加bpf.mk文件解决更新报错
