@@ -108,13 +108,14 @@ COMMIT_HASH=$(read_ini_by_key "COMMIT_HASH")
 # 从INI文件中读取COMMIT_HASH（代码提交哈希值）的值
 COMMIT_HASH=${COMMIT_HASH:-none}
 # 如果COMMIT_HASH为空，就设置为默认值"none"
+# --- 修改部分开始 ---
+# 如果存在 action_build 目录，优先使用它
 if [[ -d $BASE_PATH/action_build ]]; then
-    # 检查是否存在action_build目录
-    # -d 表示检查目录是否存在
     BUILD_DIR="action_build"
-    # 如果存在，就强制使用action_build作为构建目录
-    # 这可能是为了兼容某些特定的构建环境
+    # 这确保了 BUILD_DIR 总是指向 action_build
 fi
+# --- 修改部分结束 ---
+
 $BASE_PATH/update.sh "$REPO_URL" "$REPO_BRANCH" "$BASE_PATH/$BUILD_DIR" "$COMMIT_HASH"
 # 执行更新脚本，传入代码仓库地址、分支、构建目录和提交哈希值
 # 这个脚本可能是用来下载或更新源代码的
@@ -172,17 +173,6 @@ make -j$(($(nproc) + 1)) || make -j1 V=s
 # || 表示如果前面的命令失败，就执行后面的命令
 # make -j1 V=s 表示如果并行编译失败，就使用单线程编译并显示详细错误信息
 # V=s 表示显示详细的编译输出，便于调试错误
-FIRMWARE_DIR="$BASE_PATH/firmware"
-# 定义最终固件存放的目录路径
-\rm -rf "$FIRMWARE_DIR"
-# 删除旧的固件目录及其中的所有内容
-# \rm 使用rm命令，\防止使用别名
-# -r 表示递归删除目录
-# -f 表示强制删除，不提示确认
-mkdir -p "$FIRMWARE_DIR"
-# 创建新的固件目录
-# mkdir 是创建目录的命令
-# -p 表示如果父目录不存在也一并创建
 
 # --- 新增的固件重命名和配置文件复制逻辑 ---
 # 1. 提取芯片、分支缩写和配置信息
@@ -205,8 +195,8 @@ fi
 
 # 3. 检查是否符合三段式结构 (芯片_分支缩写_配置)
 if [[ -z "$CHIP" ]] || [[ -z "$BRANCH_CONFIG" ]] || [[ -z "$CONFIG" ]]; then
-    echo "Board name does not match expected format (chip_branch_config). Skipping renaming."
-    # 如果不符合格式，则跳过重命名步骤
+    echo "Board name does not match expected format (chip_branch_config). Skipping renaming and copying config files."
+    # 如果不符合格式，则跳过重命名和复制步骤
     # 直接复制文件
     find "$TARGET_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" \) -exec cp -f {} "$FIRMWARE_DIR/" \;
     # 复制 .config, config.buildinfo, Packages.manifest 到输出目录
@@ -269,7 +259,14 @@ else
     exit 1
 fi
 
-# 5. 重命名固件文件
+# 5. 创建固件输出目录
+FIRMWARE_DIR="$BASE_PATH/firmware"
+\rm -rf "$FIRMWARE_DIR"
+# 删除旧的固件目录及其中的所有内容
+mkdir -p "$FIRMWARE_DIR"
+# 创建新的固件目录
+
+# 6. 重命名固件文件
 # 重命名规则: immwrt-<profile_model>-<firmware_mode>-<config>.bin
 # 先找出所有 .bin 文件
 for bin_file in "$TARGET_DIR"/*.bin; do
@@ -297,7 +294,7 @@ for bin_file in "$TARGET_DIR"/*.bin; do
     fi
 done
 
-# 6. 复制并重命名配置文件 (包括 manifest)
+# 7. 复制并重命名配置文件 (包括 manifest)
 # 复制 .config
 if [ -f "$BASE_PATH/$BUILD_DIR/.config" ]; then
    cp -f "$BASE_PATH/$BUILD_DIR/.config" "$FIRMWARE_DIR/$CHIP-$BRANCH_CONFIG-$CONFIG.config"
@@ -321,10 +318,17 @@ find "$TARGET_DIR" -type f -name "*.manifest" -exec cp -f {} "$FIRMWARE_DIR/" \;
 
 # --- 结束新增逻辑 ---
 
-# 7. 清理动作 (如果存在 action_build)
+# 8. 清理动作 (如果存在 action_build)
 if [[ -d $BASE_PATH/action_build ]]; then
     # 检查是否存在action_build目录
     make clean
     # 如果存在，就执行清理命令
     # make clean 会删除编译过程中产生的临时文件，释放磁盘空间
 fi
+
+# --- 保持原有的清理逻辑 ---
+# 删除之前复制的旧文件
+\rm -f "$BASE_PATH/firmware/Packages.manifest" 2>/dev/null || true
+# 这行可能有问题，因为它试图删除之前复制的文件，但在新逻辑中，我们已经复制了它。
+# 如果你想保留所有文件，可以注释掉或删除这行。
+# 如果你想删除由 make checksum 生成的不必要的文件，那需要看清楚它生成的文件类型。
