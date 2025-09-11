@@ -221,7 +221,7 @@ mkdir -p "$FIRMWARE_DIR"
 find "$TARGET_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" -o -name ".config" -o -name "config.buildinfo" -o -name "Packages.manifest" \) -exec cp -f {} "$FIRMWARE_DIR/" \;
 
 # 复制所有编译产物文件（包括固件和manifest）从BUILD_DIR
-find "$BASE_PATH/$BUILD_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" -o -name ".config" -o -name "config.buildinfo" -o -name "Packages.manifest" \) -exec cp -f {} "$FIRMWARE_DIR/" \;
+# find "$BASE_PATH/$BUILD_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" -o -name ".config" -o -name "config.buildinfo" -o -name "Packages.manifest" \) -exec cp -f {} "$FIRMWARE_DIR/" \;
 
 \rm -f "$BASE_PATH/firmware/Packages.manifest" 2>/dev/null
 # 删除固件目录中的Packages.manifest文件（如果存在）
