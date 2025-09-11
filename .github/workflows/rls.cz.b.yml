@@ -8,7 +8,7 @@ on:
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-  # 定义芯片架构变量，用户可自行修改
+  # 定义芯片架构变量，仅用于区分缓存，缓存键(key)是区分不同缓存的唯一方式
   CHIP: ipq60xx
 jobs:
   build:
