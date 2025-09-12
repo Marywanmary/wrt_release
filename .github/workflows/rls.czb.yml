@@ -73,7 +73,7 @@ jobs:
             done
           fi
       - name: Build Firmware
-        run: ./build.cz.sh ${{ matrix.model }}
+        run: ./build.czb.sh ${{ matrix.model }}
       - name: Get Kernel Version
         run: |
           # 获取内核版本
