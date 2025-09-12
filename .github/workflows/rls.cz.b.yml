@@ -24,7 +24,7 @@ jobs:
 
         os: [ubuntu-24.04] # 矩阵用于遍历所有设备模型，实现批量编译，每个模型需要独立的构建环境和输出，保留矩阵可以方便未来扩展。
 
-      max-parallel: 3
+      # max-parallel: 3
     runs-on: ${{ matrix.os }}
     steps:
       - name: Free disk space
