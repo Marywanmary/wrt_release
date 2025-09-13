@@ -53,7 +53,7 @@ jobs:
           echo "BUILD_SRC=$BUILD_SRC" >> $GITHUB_ENV
           echo "使用芯片架构: ${{ env.CHIP }}"
       - name: Pre Clone
-        run: ./scripts/pre_clone_action.sh ${{ matrix.model }}
+        run: ./pre_clone_action.sh ${{ matrix.model }}
       - name: Cache Dependencies
         uses: actions/cache@v4
         with:
@@ -73,7 +73,7 @@ jobs:
             done
           fi
       - name: Build Firmware
-        run: ./scripts/build.czd.sh ${{ matrix.model }}
+        run: ./build.czd.sh ${{ matrix.model }}
       - name: Get Kernel Version
         run: |
           # 获取内核版本
