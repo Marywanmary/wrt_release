@@ -1,0 +1,253 @@
+# 工作流名称：Release IPQ60xx
+name: Release IPQ60xx
+
+# 触发条件：手动触发或定时触发（北京时间周五0点 = UTC时间周四16:00）
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 16 * * 4'
+
+# 环境变量
+env:
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # 定义芯片架构变量，仅用于区分缓存
+  CHIP: ipq60xx
+
+# 作业定义
+jobs:
+  # 构建作业
+  build:
+    # 策略：使用矩阵遍历所有设备模型
+    strategy:
+      matrix:
+        model:
+          - ipq60xx_immwrt_Pro
+          - ipq60xx_immwrt_Max
+          - ipq60xx_immwrt_Ultra
+          - ipq60xx_libwrt_Pro
+          - ipq60xx_libwrt_Max
+          - ipq60xx_libwrt_Ultra
+        os: [ubuntu-24.04] # 操作系统矩阵
+
+    # 运行环境
+    runs-on: ${{ matrix.os }}
+    
+    # 步骤定义
+    steps:
+      # 步骤1：释放磁盘空间
+      - name: Free disk space
+        uses: sbwml/actions@free-disk
+        
+      # 步骤2：设置构建环境
+      - name: Build System Setup
+        run: |
+          # 执行官方构建环境初始化脚本
+          sudo bash -c 'bash <(curl -sL https://build-scripts.immortalwrt.org/init_build_environment.sh)'
+          # 安装额外依赖包
+          sudo -E apt -yqq install dos2unix
+          sudo -E apt -yqq install libfuse-dev
+          # 清理不需要的软件包
+          sudo -E apt -yqq autoremove --purge
+          sudo -E apt -yqq autoclean
+          sudo -E apt -yqq clean
+          sudo -E systemctl daemon-reload
+          
+      # 步骤3：检出代码
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      # 步骤4：设置脚本执行权限
+      - name: Set Execute Permissions
+        run: |
+          echo "=== 设置执行权限 ==="
+          # 为所有shell脚本添加执行权限
+          find . -name "*.sh" -type f -exec sh -c 'head -n1 "$1" | grep -q "^#!/" && chmod +x "$1"' _ {} \;
+          
+      # 步骤5：设置构建日期和时区
+      - name: Set Build Date and Timezone
+        run: |
+          # 设置时区为上海（北京时间）
+          sudo -E timedatectl set-timezone "Asia/Shanghai"
+          # 生成构建日期
+          export BUILD_DATE=$(TZ=UTC-8 date +"%y.%m.%d_%H.%M.%S")
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
+          # 获取构建源
+          export BUILD_SRC=$(awk -F"=" '/REPO_URL/ {print $NF}' "./compilecfg/${{ matrix.model }}.ini")
+          echo "BUILD_SRC=$BUILD_SRC" >> $GITHUB_ENV
+          echo "使用芯片架构: ${{ env.CHIP }}"
+          
+      # 步骤6：预克隆操作
+      - name: Pre Clone
+        run: ./scripts/pre_clone_action.sh ${{ matrix.model }}
+        
+      # 步骤7：缓存依赖项
+      - name: Cache Dependencies
+        uses: actions/cache@v4
+        with:
+          # 缓存路径
+          path: |
+            ./action_build/.ccache
+            ./action_build/staging_dir
+          # 缓存键
+          key: ${{ matrix.os }}-${{ env.CHIP }}-${{ hashFiles('**/repo_flag') }}-${{ env.BUILD_DATE }}
+          # 恢复键
+          restore-keys: |
+            ${{ matrix.os }}-${{ env.CHIP }}-${{ hashFiles('**/repo_flag') }}-
+            ${{ matrix.os }}-${{ env.CHIP }}-
+            
+      # 步骤8：刷新缓存
+      - name: Refresh the cache
+        run: |
+          # 如果staging_dir存在，则刷新所有stamp文件的时间戳
+          if [ -d "./action_build/staging_dir" ]; then
+            find "./action_build/staging_dir" -type d -name "stamp" -not -path "*target*" | while read -r dir; do
+                find "$dir" -type f -exec touch {} +
+            done
+          fi
+          
+      # 步骤9：构建固件
+      - name: Build Firmware
+        run: ./scripts/build.sh ${{ matrix.model }}
+        
+      # 步骤10：获取内核版本
+      - name: Get Kernel Version
+        run: |
+          # 从下载的内核文件中提取版本号
+          echo "KVER=$(find ./action_build/dl -maxdepth 1 -name "linux-[4-6]\.*" | sort -r | head -n 1 | grep -oE "[4-6]\.[0-9]{1,3}\.[0-9]{1,3}")" >> $GITHUB_ENV
+          
+      # 步骤11：删除旧缓存
+      - name: Delete Old Cache
+        run: |
+          # 获取缓存列表并删除旧缓存
+          gh cache list --key ${{ matrix.os }}-${{ env.CHIP }}-${{ hashFiles('**/repo_flag') }}- --json key --jq '.[] | .key' | while read -r key; do
+            gh cache delete "$key"
+          done
+          # 输出缓存状态
+          echo "========cache status========"
+          echo "ccache: $(du -sh ./action_build/.ccache | cut -f 1)"
+          echo "staging: $(du -sh ./action_build/staging_dir | cut -f 1)"
+          
+      # 步骤12：显示机器信息
+      - name: Machine Information
+        run: |
+          echo "=============================================="
+          lscpu | grep -E "name|Core|Thread"
+          echo "=============================================="
+          df -h
+          echo "=============================================="
+          
+      # 步骤13：上传构建产物
+      - name: Upload Firmware Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          # 产物名称
+          name: firmware-${{ matrix.model }}
+          # 产物路径
+          path: ./temp_firmware/${{ matrix.model }}/
+          # 保留天数
+          retention-days: 3
+
+  # 发布作业
+  release:
+    # 依赖构建作业
+    needs: build
+    # 运行环境
+    runs-on: ubuntu-24.04
+    # 步骤定义
+    steps:
+      # 步骤1：检出代码
+      - name: Checkout
+        uses: actions/checkout@v4
+        
+      # 步骤2：设置构建日期
+      - name: Set Build Date
+        run: |
+          # 设置时区并生成构建日期
+          sudo -E timedatectl set-timezone "Asia/Shanghai"
+          export BUILD_DATE=$(TZ=UTC-8 date +"%y.%m.%d_%H.%M.%S")
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
+          
+      # 步骤3：下载所有构建产物
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          # 下载路径
+          path: all-firmware
+          
+      # 步骤4：准备固件目录
+      - name: Prepare firmware directory
+        run: |
+          # 创建固件目录
+          mkdir -p firmware
+          # 将所有固件文件复制到一个目录（排除ipk和apk目录）
+          find all-firmware -name "*.*" -type f -not -path "*/ipk/*" -not -path "*/apk/*" -exec cp {} firmware/ \;
+          
+          # 复制合并后的ipk和apk目录
+          cp -r all-firmware/*/ipk firmware/ 2>/dev/null || true
+          cp -r all-firmware/*/apk firmware/ 2>/dev/null || true
+          
+          # 进入固件目录
+          cd firmware
+          
+          # 检查ipk目录是否存在且有内容，然后创建压缩包
+          if [ -d "ipk" ] && [ "$(ls -A ipk 2>/dev/null)" ]; then
+              echo "Creating ipk_packages.tar.gz..."
+              tar -czf ipk_packages.tar.gz ipk/
+          else
+              echo "ipk directory is empty or does not exist, skipping ipk package creation"
+          fi
+          
+          # 检查apk目录是否存在且有内容，然后创建压缩包
+          if [ -d "apk" ] && [ "$(ls -A apk 2>/dev/null)" ]; then
+              echo "Creating apk_packages.tar.gz..."
+              tar -czf apk_packages.tar.gz apk/
+          else
+              echo "apk directory is empty or does not exist, skipping apk package creation"
+          fi
+          
+          # 返回上级目录
+          cd ..
+          
+          # 创建发布说明
+          echo "IPQ60xx 固件批量发布" > release_body.txt
+          echo "构建时间: $BUILD_DATE" >> release_body.txt
+          echo "包含以下型号:" >> release_body.txt
+          echo "- ipq60xx_immwrt_Pro" >> release_body.txt
+          echo "- ipq60xx_immwrt_Max" >> release_body.txt
+          echo "- ipq60xx_immwrt_Ultra" >> release_body.txt
+          echo "- ipq60xx_libwrt_Pro" >> release_body.txt
+          echo "- ipq60xx_libwrt_Max" >> release_body.txt
+          echo "- ipq60xx_libwrt_Ultra" >> release_body.txt
+          echo "" >> release_body.txt
+          echo "WIFI密码: 12345678" >> release_body.txt
+          echo "LAN地址: 192.168.111.1" >> release_body.txt
+          echo "" >> release_body.txt
+          echo "本发布包含以下文件:" >> release_body.txt
+          echo "- 各型号固件文件 (.bin, .manifest, .config等)" >> release_body.txt
+          
+          # 根据实际情况添加ipk和apk包的信息
+          if [ -f "firmware/ipk_packages.tar.gz" ]; then
+              echo "- 合并后的ipk包 (ipk_packages.tar.gz)" >> release_body.txt
+              echo "" >> release_body.txt
+              echo "IPK包数量: $(find firmware/ipk -name "*.ipk" | wc -l)" >> release_body.txt
+          fi
+          
+          if [ -f "firmware/apk_packages.tar.gz" ]; then
+              echo "- 合并后的apk包 (apk_packages.tar.gz)" >> release_body.txt
+              echo "" >> release_body.txt
+              echo "APK包数量: $(find firmware/apk -name "*.apk" | wc -l)" >> release_body.txt
+          fi
+          
+      # 步骤5：发布固件
+      - name: Release Firmware
+        uses: softprops/action-gh-release@v2
+        with:
+          # 标签名称
+          tag_name: ${{ env.BUILD_DATE }}-${{ env.CHIP }}-ChatZ
+          # 发布文件（排除ipk和apk目录）
+          files: |
+            ./firmware/*.*
+            !./firmware/ipk/
+            !./firmware/apk/
+          # 发布说明文件路径
+          body_path: ./release_body.txt
