@@ -241,8 +241,9 @@ if [[ $Dev =~ ^([^_]+)_([^_]+)_([^_]+)$ ]]; then
         filename=$(basename "$firmware")
         
         # 检查是否是目标固件文件
-        if [[ $filename =~ immortalwrt-qualcommax-.*-jdcloud_(.+)-squashfs-(.+)\.bin ]]; then
-            MODEL="${BASH_REMATCH[1]}"   # 固件型号 (如 re-cs-02)
+        # 匹配规则：文件名包含CHIP变量，CHIP变量后有个-连接符，之后到-squashfs-之间的为固件型号，以factory或sysupgrade结尾
+        if [[ $filename =~ .*${CHIP}-(.+)-squashfs-(factory|sysupgrade)\.bin ]]; then
+            MODEL="${BASH_REMATCH[1]}"   # 固件型号 (如 jdcloud_re-cs-02 或 glinet_gl-ax1800)
             MODE="${BASH_REMATCH[2]}"    # 固件模式 (如 factory 或 sysupgrade)
             
             # 根据分支缩写构建新文件名
@@ -258,6 +259,8 @@ if [[ $Dev =~ ^([^_]+)_([^_]+)_([^_]+)$ ]]; then
             # 重命名文件
             mv "$firmware" "$DEVICE_TEMP_DIR/$new_filename"
             echo "Renamed $filename to $new_filename"
+        else
+            echo "Skipping $filename - does not match expected pattern"
         fi
     done
     
