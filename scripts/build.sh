@@ -1,179 +1,231 @@
 #!/usr/bin/env bash
-# 设置脚本遇到错误时立即退出
 set -e
 
-# 获取当前脚本所在目录的绝对路径
-# BASE_PATH=$(cd "$(dirname "$0")/.." && pwd)
-BASE_PATH="$(dirname "$(dirname "$(readlink -f "$0")")")"
+# 获取脚本所在目录
+SCRIPT_DIR=$(cd $(dirname $0) && pwd)
+# 获取仓库根目录（脚本目录的上一级）
+BASE_PATH=$(cd "$SCRIPT_DIR/.." && pwd)
 
-# 使用统一的构建目录
-BUILD_DIR="$BASE_PATH/action_build"
-# 创建构建目录 if it doesn't exist
-mkdir -p "$BUILD_DIR"
-
-# 获取第一个参数作为设备型号（如 ipq60xx_immwrt_Pro）
+# 获取运行脚本时传入的第一个参数（设备名称）
 Dev=$1
-
-# 获取第二个参数作为构建模式（如 debug）
+# 获取运行脚本时传入的第二个参数（构建模式）
 Build_Mod=$2
 
-# 定义配置文件路径（根据设备型号确定）
+# 定义配置文件的完整路径
 CONFIG_FILE="$BASE_PATH/deconfig/$Dev.config"
-
-# 定义 INI 配置文件路径（用于获取仓库信息等）
+# 定义INI配置文件的完整路径
 INI_FILE="$BASE_PATH/compilecfg/$Dev.ini"
 
-# 检查配置文件是否存在，如果不存在则报错并退出
+# 检查配置文件是否存在
 if [[ ! -f $CONFIG_FILE ]]; then
-    echo "配置文件未找到: $CONFIG_FILE"
+    echo "Config not found: $CONFIG_FILE"
     exit 1
 fi
 
-# 检查 INI 配置文件是否存在，如果不存在则报错并退出
+# 检查INI文件是否存在
 if [[ ! -f $INI_FILE ]]; then
-    echo "INI 文件未找到: $INI_FILE"
+    echo "INI file not found: $INI_FILE"
     exit 1
 fi
 
-# 定义一个函数：从 INI 文件中读取指定键的值
+# 定义从INI文件中读取指定键值的函数
 read_ini_by_key() {
-    local key=$1  # 接收要查找的键名
-    # 使用 awk 命令读取 INI 文件，匹配键名并输出对应的值
+    local key=$1
     awk -F"=" -v key="$key" '$1 == key {print $2}' "$INI_FILE"
 }
 
-# 定义一个函数：移除 uhttpd 依赖
-# 当启用 luci-app-quickfile 插件时，表示启动 nginx，所以移除 luci 对 uhttpd(luci-light) 的依赖
+# 定义移除uhttpd依赖的函数
 remove_uhttpd_dependency() {
-    # 获取构建目录下的 .config 配置文件路径
-    local config_path="$BUILD_DIR/.config"
-    # 获取 luci 项目的 Makefile 路径
-    local luci_makefile_path="$BUILD_DIR/feeds/luci/collections/luci/Makefile"
-    
-    # 检查 .config 文件中是否启用了 luci-app-quickfile 插件
+    local config_path="$BASE_PATH/$BUILD_DIR/.config"
+    local luci_makefile_path="$BASE_PATH/$BUILD_DIR/feeds/luci/collections/luci/Makefile"
+    # 检查是否启用了quickfile插件
     if grep -q "CONFIG_PACKAGE_luci-app-quickfile=y" "$config_path"; then
-        # 如果 Makefile 存在，则删除其中包含 luci-light 的行
         if [ -f "$luci_makefile_path" ]; then
+            # 删除包含luci-light的行
             sed -i '/luci-light/d' "$luci_makefile_path"
-            echo "已移除 uhttpd (luci-light) 依赖，因为启用了 luci-app-quickfile (nginx)。"
+            echo "Removed uhttpd (luci-light) dependency as luci-app-quickfile (nginx) is enabled."
         fi
     fi
 }
 
-# 应用配置文件：复制配置文件到构建目录
-\cp -f "$CONFIG_FILE" "$BUILD_DIR/.config"
+# 定义应用配置文件的函数
+apply_config() {
+    # 复制配置文件到构建目录
+    \cp -f "$CONFIG_FILE" "$BASE_PATH/$BUILD_DIR/.config"
+}
 
-# 从 INI 文件中读取仓库 URL
+# 从INI文件中读取仓库地址
 REPO_URL=$(read_ini_by_key "REPO_URL")
-
-# 从 INI 文件中读取仓库分支名
+# 从INI文件中读取仓库分支
 REPO_BRANCH=$(read_ini_by_key "REPO_BRANCH")
-
-# 如果没有指定分支名，默认使用 main 分支
+# 如果分支为空则设置为默认值main
 REPO_BRANCH=${REPO_BRANCH:-main}
-
-# 从 INI 文件中读取构建目录名
-# BUILD_DIR=$(read_ini_by_key "BUILD_DIR")
-
-# 从 INI 文件中读取提交哈希值
+# 从INI文件中读取构建目录
+BUILD_DIR=$(read_ini_by_key "BUILD_DIR")
+# 从INI文件中读取提交哈希值
 COMMIT_HASH=$(read_ini_by_key "COMMIT_HASH")
+# 如果哈希值为空则设置为默认值none
+COMMIT_HASH=${COMMIT_HASH:-none}
 
-# 调用 update.sh 脚本更新源码仓库
-$BASE_PATH/scripts/update.sh "$REPO_URL" "$REPO_BRANCH" "$BUILD_DIR" "$COMMIT_HASH"
+# 检查是否存在action_build目录，存在则强制使用该目录作为构建目录
+if [[ -d $BASE_PATH/action_build ]]; then
+    BUILD_DIR="action_build"
+fi
 
-# 调用 remove_uhttpd_dependency 函数移除依赖
+# 执行更新脚本，传入仓库地址、分支、构建目录和提交哈希值
+"$SCRIPT_DIR/update.sh" "$REPO_URL" "$REPO_BRANCH" "$BASE_PATH/$BUILD_DIR" "$COMMIT_HASH"
+
+# 应用配置文件
+apply_config
+# 移除uhttpd依赖
 remove_uhttpd_dependency
 
-# 进入构建目录
-# cd "$BASE_PATH/$BUILD_DIR"
-cd "$BUILD_DIR"
-
-# Install Feeds(安装feeds)
-./scripts/feeds update -a
-./scripts/feeds install -a
-./scripts/feeds update -p package/feeds/packages/boost-system
-        
-# 执行默认配置
+# 切换到构建目录
+cd "$BASE_PATH/$BUILD_DIR"
+# 执行make defconfig命令生成默认配置
 make defconfig
 
-# 检查配置文件中是否包含 x86_64 架构
+# 检查是否是x86_64平台
 if grep -qE "^CONFIG_TARGET_x86_64=y" "$CONFIG_FILE"; then
-    # 定义 distfeeds 配置文件路径
+    # 定义软件源配置文件路径
     DISTFEEDS_PATH="$BASE_PATH/$BUILD_DIR/package/emortal/default-settings/files/99-distfeeds.conf"
-    # 如果配置文件存在，则替换其中的架构信息
+    # 检查软件源配置文件是否存在
     if [ -d "${DISTFEEDS_PATH%/*}" ] && [ -f "$DISTFEEDS_PATH" ]; then
+        # 替换架构名称从ARM到x86_64
         sed -i 's/aarch64_cortex-a53/x86_64/g' "$DISTFEEDS_PATH"
     fi
 fi
 
-# 如果构建模式是 debug，则只执行到这里，不进行实际构建
+# 如果是调试模式则直接退出
 if [[ $Build_Mod == "debug" ]]; then
     exit 0
 fi
 
-# 定义目标目录路径
+# 定义目标文件目录路径
 TARGET_DIR="$BASE_PATH/$BUILD_DIR/bin/targets"
 
-# 如果目标目录存在，则清空其中的固件文件
+# 如果目标目录存在，则删除旧的编译产物
 if [[ -d $TARGET_DIR ]]; then
-    find "$TARGET_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" \) -exec rm -f {} +
+    find "$TARGET_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" -o -name ".config" -o -name "config.buildinfo" -o -name "Packages.manifest" \) -exec rm -f {} +
 fi
 
-# 下载所需的软件包
+# 下载编译所需的源代码包
 make download -j$(($(nproc) * 2))
-
-# 开始编译固件，使用多线程（线程数 = CPU核心数 + 1）
-# 如果编译失败，则回退到单线程模式
+# 开始编译固件
 make -j$(($(nproc) + 1)) || make -j1 V=s
 
-# 创建设备型号特定的固件输出目录
-FIRMWARE_DIR="$BASE_PATH/firmware_$Dev"
-\rm -rf "$FIRMWARE_DIR"
-mkdir -p "$FIRMWARE_DIR"
+# 创建临时目录用于存放所有产出物
+TEMP_DIR="$BASE_PATH/temp_firmware"
+\rm -rf "$TEMP_DIR"
+mkdir -p "$TEMP_DIR"
 
-# 解析设备型号：芯片组_openwrt分支缩写_配置
-CHIPSET=$(echo "$Dev" | cut -d'_' -f1)
-BRANCH=$(echo "$Dev" | cut -d'_' -f2)
-CONFIG=$(echo "$Dev" | cut -d'_' -f3)
+# 创建总的ipk和apk目录
+mkdir -p "$TEMP_DIR/ipk"
+mkdir -p "$TEMP_DIR/apk"
 
-# 生成设备前缀（用于配置文件重命名）
-DEVICE_PREFIX="${CHIPSET}-${BRANCH}-${CONFIG}"
+# 创建设备专属目录
+DEVICE_TEMP_DIR="$TEMP_DIR/$Dev"
+mkdir -p "$DEVICE_TEMP_DIR"
 
-# 查找并复制所有固件相关文件到输出目录，并重命名
-find "$TARGET_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" \) | while read -r file; do
-    filename=$(basename "$file")
-    extension="${filename##*.}"
+# 复制.config文件
+if [[ -f "$BASE_PATH/$BUILD_DIR/.config" ]]; then
+    \cp -f "$BASE_PATH/$BUILD_DIR/.config" "$DEVICE_TEMP_DIR/"
+fi
+
+# 复制编译产物文件
+find "$TARGET_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi.img.gz" -o -name "*.itb" -o -name "*.fip" -o -name "*.ubi" -o -name "*rootfs.tar.gz" -o -name ".config" -o -name "config.buildinfo" -o -name "Packages.manifest" \) -exec cp -f {} "$DEVICE_TEMP_DIR/" \;
+
+# 复制ipk文件
+IPK_DIR="$BASE_PATH/$BUILD_DIR/bin/packages"
+if [[ -d "$IPK_DIR" ]]; then
+    find "$IPK_DIR" -name "*.ipk" -type f -exec cp -f {} "$TEMP_DIR/ipk/" 2>/dev/null || true
+    echo "Copied ipk files for $Dev"
+fi
+
+# 复制apk文件
+APK_DIR="$BASE_PATH/$BUILD_DIR/bin/package"
+if [[ -d "$APK_DIR" ]]; then
+    find "$APK_DIR" -name "*.apk" -type f -exec cp -f {} "$TEMP_DIR/apk/" 2>/dev/null || true
+    echo "Copied apk files for $Dev"
+fi
+
+# 固件重命名部分
+# 解析设备名称，检查是否符合三段式结构
+if [[ $Dev =~ ^([^_]+)_([^_]+)_([^_]+)$ ]]; then
+    CHIP="${BASH_REMATCH[1]}"      # 芯片部分
+    BRANCH_ABBR="${BASH_REMATCH[2]}" # 分支缩写
+    CONFIG="${BASH_REMATCH[3]}"     # 配置部分
     
-    # 只对.bin文件应用重命名规则
-    if [[ "$extension" == "bin" ]]; then
-        # 提取固件类型（factory/sysupgrade等）
-        firmware_type=$(echo "$filename" | grep -oE "(factory|sysupgrade|initramfs)" | head -1)
-        
-        # 提取设备型号部分（如 jdcloud_re-cs-02 或 jdcloud_re-ss-01）
-        device_model=$(echo "$filename" | sed -E "s/.*$CHIPSET-([^-]+)-[^-]+-$firmware_type\.bin/\1/")
-        
-        # 构建新文件名：分支-设备型号-固件类型-配置.bin
-        new_filename="${BRANCH}-${device_model}-${firmware_type}-${CONFIG}.bin"
-    else
-        # 非.bin文件保持原名
-        new_filename="$filename"
-    fi
+    echo "Device name parsed: CHIP=$CHIP, BRANCH_ABBR=$BRANCH_ABBR, CONFIG=$CONFIG"
     
-    # 复制文件到输出目录（使用新文件名）
-    cp -f "$file" "$FIRMWARE_DIR/$new_filename"
-done
+    # 重命名固件文件
+    for firmware in "$DEVICE_TEMP_DIR"/*.bin; do
+        # 获取文件名（不含路径）
+        filename=$(basename "$firmware")
+        
+        # 检查是否是目标固件文件
+        if [[ $filename =~ .*${CHIP}-(.+)-squashfs-(factory|sysupgrade)\.bin ]]; then
+            MODEL="${BASH_REMATCH[1]}"   # 固件型号
+            MODE="${BASH_REMATCH[2]}"    # 固件模式
+            
+            # 根据分支缩写构建新文件名
+            if [[ "$BRANCH_ABBR" == "immwrt" ]]; then
+                new_filename="immwrt-${MODEL}-${MODE}-${CONFIG}.bin"
+            elif [[ "$BRANCH_ABBR" == "libwrt" ]]; then
+                new_filename="libwrt-${MODEL}-${MODE}-${CONFIG}.bin"
+            else
+                # 默认格式
+                new_filename="${BRANCH_ABBR}-${MODEL}-${MODE}-${CONFIG}.bin"
+            fi
+            
+            # 重命名文件
+            mv "$firmware" "$DEVICE_TEMP_DIR/$new_filename"
+            echo "Renamed $filename to $new_filename"
+        else
+            echo "Skipping $filename - does not match expected pattern"
+        fi
+    done
+    
+    # 重命名manifest文件
+    for manifest_file in "$DEVICE_TEMP_DIR"/*.manifest; do
+        if [[ -f "$manifest_file" ]]; then
+            # 获取文件名（不含路径）
+            filename=$(basename "$manifest_file")
+            # 构建新文件名
+            new_filename="${CHIP}-${BRANCH_ABBR}-${CONFIG}.manifest"
+            # 重命名文件
+            mv "$manifest_file" "$DEVICE_TEMP_DIR/$new_filename"
+            echo "Renamed manifest file $filename to $new_filename"
+        fi
+    done
+    
+    # 重命名配置文件
+    config_files=(".config" "config.buildinfo" "Packages.manifest")
+    for file in "${config_files[@]}"; do
+        if [[ -f "$DEVICE_TEMP_DIR/$file" ]]; then
+            # 构建新文件名
+            if [[ "$file" == .* ]]; then
+                # 对于以点开头的文件，直接追加
+                new_file="${CHIP}-${BRANCH_ABBR}-${CONFIG}${file}"
+            else
+                # 对于其他文件，添加点号
+                new_file="${CHIP}-${BRANCH_ABBR}-${CONFIG}.${file}"
+            fi
+            
+            # 重命名文件
+            mv "$DEVICE_TEMP_DIR/$file" "$DEVICE_TEMP_DIR/$new_file"
+            echo "Renamed $file to $new_file"
+        else
+            echo "Warning: Config file not found in device temp directory: $file"
+        fi
+    done
+else
+    echo "Device name '$Dev' does not follow the three-part structure, skipping renaming."
+fi
 
-# 复制并重命名配置文件
-for config_file in ".config" "config.buildinfo" "manifest" "Packages.manifest"; do
-    src_path="$BASE_PATH/$BUILD_DIR/$config_file"
-    if [[ -f "$src_path" ]]; then
-        # 生成新文件名：设备前缀.原文件名
-        new_filename="${DEVICE_PREFIX}.${config_file}"
-        cp -f "$src_path" "$FIRMWARE_DIR/$new_filename"
-    fi
-done
-
-# 如果是定时触发（批量编译），不清理构建目录，以便共享缓存
-if [[ "$GITHUB_EVENT_NAME" != "schedule" ]]; then
+# 如果存在action_build目录，则执行清理命令
+if [[ -d $BASE_PATH/action_build ]]; then
     make clean
 fi
+
+echo "Build completed for $Dev. All artifacts are in $DEVICE_TEMP_DIR"
