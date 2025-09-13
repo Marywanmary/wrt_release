@@ -194,6 +194,10 @@ TEMP_DIR="$BASE_PATH/temp_firmware"
 \rm -rf "$TEMP_DIR"
 mkdir -p "$TEMP_DIR"
 
+# 创建总的ipk和apk目录
+mkdir -p "$TEMP_DIR/ipk"
+mkdir -p "$TEMP_DIR/apk"
+
 # 创建设备专属目录
 DEVICE_TEMP_DIR="$TEMP_DIR/$Dev"
 mkdir -p "$DEVICE_TEMP_DIR"
@@ -209,16 +213,16 @@ find "$TARGET_DIR" -type f \( -name "*.bin" -o -name "*.manifest" -o -name "*efi
 # 复制ipk文件
 IPK_DIR="$BASE_PATH/$BUILD_DIR/bin/packages"
 if [[ -d "$IPK_DIR" ]]; then
-    mkdir -p "$DEVICE_TEMP_DIR/ipk"
-    find "$IPK_DIR" -name "*.ipk" -type f -exec cp -f {} "$DEVICE_TEMP_DIR/ipk/" \;
+    # 直接复制到临时目录的ipk目录，覆盖重复文件
+    find "$IPK_DIR" -name "*.ipk" -type f -exec cp -f {} "$TEMP_DIR/ipk/" 2>/dev/null || true
     echo "Copied ipk files for $Dev"
 fi
 
 # 复制apk文件（如果有的话）
 APK_DIR="$BASE_PATH/$BUILD_DIR/bin/apk"
 if [[ -d "$APK_DIR" ]]; then
-    mkdir -p "$DEVICE_TEMP_DIR/apk"
-    find "$APK_DIR" -name "*.apk" -type f -exec cp -f {} "$DEVICE_TEMP_DIR/apk/" \;
+    # 直接复制到临时目录的apk目录，覆盖重复文件
+    find "$APK_DIR" -name "*.apk" -type f -exec cp -f {} "$TEMP_DIR/apk/" 2>/dev/null || true
     echo "Copied apk files for $Dev"
 fi
 
@@ -294,26 +298,6 @@ else
     echo "Device name '$Dev' does not follow the three-part structure, skipping renaming."
 fi
 # === 重命名部分结束 ===
-
-# === 新增部分：合并所有设备的ipk和apk文件 ===
-# 创建总的ipk和apk目录
-mkdir -p "$TEMP_DIR/ipk"
-mkdir -p "$TEMP_DIR/apk"
-
-# 合并当前设备的ipk文件
-if [[ -d "$DEVICE_TEMP_DIR/ipk" ]]; then
-    # 复制当前设备的ipk文件到总目录，覆盖重复文件
-    cp -f "$DEVICE_TEMP_DIR/ipk"/*.ipk "$TEMP_DIR/ipk/" 2>/dev/null || true
-    echo "Merged ipk files for $Dev"
-fi
-
-# 合并当前设备的apk文件
-if [[ -d "$DEVICE_TEMP_DIR/apk" ]]; then
-    # 复制当前设备的apk文件到总目录，覆盖重复文件
-    cp -f "$DEVICE_TEMP_DIR/apk"/*.apk "$TEMP_DIR/apk/" 2>/dev/null || true
-    echo "Merged apk files for $Dev"
-fi
-# === 合并部分结束 ===
 
 if [[ -d $BASE_PATH/action_build ]]; then
     # 检查是否存在action_build目录
