@@ -223,7 +223,7 @@ jobs:
           echo "LAN地址: 192.168.111.1" >> release_body.txt
           echo "" >> release_body.txt
           echo "本发布包含以下文件:" >> release_body.txt
-          echo "- 各型号固件文件 (.bin, .manifest, .config等)" >> release_body.txt
+          echo "- 京东云亚瑟、雅典娜的Pro/Max/Ultra配置固件及配置文件 (.bin, .manifest, .config，.config.buildinfo等)" >> release_body.txt
           
           # 根据实际情况添加ipk和apk包的信息
           if [ -f "firmware/ipk_packages.tar.gz" ]; then
