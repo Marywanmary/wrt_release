@@ -29,7 +29,7 @@ jobs:
           - ipq60xx_libwrt_Ultra
         os: [ubuntu-24.04] # 操作系统矩阵
       # 允许失败的任务继续执行
-      fail-fast: false
+      # fail-fast: false
       # 最大并行数，避免资源耗尽
       # max-parallel: 3
 
