@@ -31,7 +31,7 @@ jobs:
       # 允许失败的任务继续执行
       fail-fast: false
       # 最大并行数，避免资源耗尽
-      max-parallel: 3
+      # max-parallel: 3
 
     # 运行环境
     runs-on: ${{ matrix.os }}
