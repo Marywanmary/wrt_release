@@ -243,7 +243,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           # 标签名称
-          tag_name: ${{ env.BUILD_DATE }}-${{ env.CHIP }}-ChatZ
+          tag_name: ${{ env.BUILD_DATE }}-${{ env.CHIP }}
           # 发布文件（排除ipk和apk目录）
           files: |
             ./firmware/*.*
