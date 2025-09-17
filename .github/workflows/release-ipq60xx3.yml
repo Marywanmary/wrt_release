@@ -110,18 +110,31 @@ jobs:
       - name: Build Firmware and Capture Logs
         id: build
         run: |
-          # 创建日志目录
-          mkdir -p ./temp_firmware/${{ matrix.model }}/logs
-          
-          # 设置日志文件路径
+          # 设置日志文件路径 - 使用build.sh的临时目录结构
           FULL_LOG="./temp_firmware/${{ matrix.model }}/logs/build_full.log"
           ERROR_LOG="./temp_firmware/${{ matrix.model }}/logs/build_errors.log"
           WARNING_LOG="./temp_firmware/${{ matrix.model }}/logs/build_warnings.log"
+          
+          # 创建日志目录
+          mkdir -p "$(dirname "$FULL_LOG")"
+          
+          # 创建空日志文件，确保文件存在
+          touch "$FULL_LOG" "$ERROR_LOG" "$WARNING_LOG"
           
           # 执行构建脚本并捕获完整日志
           echo "开始构建 ${{ matrix.model }}..."
           ./scripts/build.sh ${{ matrix.model }} 2>&1 | tee "$FULL_LOG"
           BUILD_EXIT_CODE=${PIPESTATUS[0]}
+          
+          # 检查日志文件是否存在
+          if [ ! -f "$FULL_LOG" ]; then
+            echo "错误: 完整日志文件不存在: $FULL_LOG"
+            echo "build_status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          # 确保错误和警告日志文件存在
+          touch "$ERROR_LOG" "$WARNING_LOG"
           
           # 从完整日志中提取错误信息
           echo "=== 错误日志 ===" > "$ERROR_LOG"
@@ -132,7 +145,7 @@ jobs:
           grep -i "warning\|warn" "$FULL_LOG" >> "$WARNING_LOG" || echo "未发现警告信息" >> "$WARNING_LOG"
           
           # 如果日志文件过大，进行压缩
-          if [ $(stat -c%s "$FULL_LOG" 2>/dev/null || echo 0) -gt 10485760 ]; then
+          if [ -f "$FULL_LOG" ] && [ $(stat -c%s "$FULL_LOG" 2>/dev/null || echo 0) -gt 10485760 ]; then
             echo "压缩大日志文件..."
             gzip "$FULL_LOG"
             FULL_LOG="${FULL_LOG}.gz"
@@ -151,6 +164,18 @@ jobs:
           echo "- 完整日志: $FULL_LOG"
           echo "- 错误日志: $ERROR_LOG"
           echo "- 警告日志: $WARNING_LOG"
+          
+          # 列出日志目录内容，用于调试
+          echo "日志目录内容:"
+          ls -la "$(dirname "$FULL_LOG")"
+          
+          # 检查temp_firmware目录是否存在
+          if [ -d "./temp_firmware/${{ matrix.model }}" ]; then
+            echo "temp_firmware目录内容:"
+            ls -la ./temp_firmware/${{ matrix.model }}/
+          else
+            echo "警告: temp_firmware/${{ matrix.model }} 目录不存在"
+          fi
           
       # 步骤10：删除旧缓存
       - name: Delete Old Cache
