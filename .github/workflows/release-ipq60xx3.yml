@@ -110,21 +110,15 @@ jobs:
       - name: Build Firmware and Capture Logs
         id: build
         run: |
-          # 设置日志文件路径 - 使用build.sh的临时目录结构
+          # 设置日志文件路径
           FULL_LOG="./temp_firmware/${{ matrix.model }}/logs/build_full.log"
           ERROR_LOG="./temp_firmware/${{ matrix.model }}/logs/build_errors.log"
           WARNING_LOG="./temp_firmware/${{ matrix.model }}/logs/build_warnings.log"
           
-          # 创建日志目录
-          mkdir -p "$(dirname "$FULL_LOG")"
-          
-          # 创建空日志文件，确保文件存在
-          touch "$FULL_LOG" "$ERROR_LOG" "$WARNING_LOG"
-          
-          # 执行构建脚本并捕获完整日志
+          # 执行构建脚本（日志记录已在build.sh中处理）
           echo "开始构建 ${{ matrix.model }}..."
-          ./scripts/build.sh ${{ matrix.model }} 2>&1 | tee "$FULL_LOG"
-          BUILD_EXIT_CODE=${PIPESTATUS[0]}
+          ./scripts/build.sh ${{ matrix.model }}
+          BUILD_EXIT_CODE=$?
           
           # 检查日志文件是否存在
           if [ ! -f "$FULL_LOG" ]; then
@@ -133,19 +127,8 @@ jobs:
             exit 1
           fi
           
-          # 确保错误和警告日志文件存在
-          touch "$ERROR_LOG" "$WARNING_LOG"
-          
-          # 从完整日志中提取错误信息
-          echo "=== 错误日志 ===" > "$ERROR_LOG"
-          grep -i "error\|failed\|failure" "$FULL_LOG" | grep -v "make.*error.*required" >> "$ERROR_LOG" || echo "未发现错误信息" >> "$ERROR_LOG"
-          
-          # 从完整日志中提取警告信息
-          echo "=== 警告日志 ===" > "$WARNING_LOG"
-          grep -i "warning\|warn" "$FULL_LOG" >> "$WARNING_LOG" || echo "未发现警告信息" >> "$WARNING_LOG"
-          
           # 如果日志文件过大，进行压缩
-          if [ -f "$FULL_LOG" ] && [ $(stat -c%s "$FULL_LOG" 2>/dev/null || echo 0) -gt 10485760 ]; then
+          if [ $(stat -c%s "$FULL_LOG" 2>/dev/null || echo 0) -gt 10485760 ]; then
             echo "压缩大日志文件..."
             gzip "$FULL_LOG"
             FULL_LOG="${FULL_LOG}.gz"
